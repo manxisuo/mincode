@@ -507,7 +507,11 @@ button.linkish:hover:not(:disabled) {
   margin: 0 0 4px 6px;
 }
 .tl-item .t { color: var(--muted); margin-right: 8px; }
-.tl-item .ty { margin-right: 8px; }
+.tl-item .ty {
+  margin-right: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .tl-item.tool .ty { color: var(--accent); }
 .tl-item.llm .ty { color: var(--llm-accent); }
 .tl-item.stream .ty { color: var(--stream-accent); }
@@ -527,6 +531,107 @@ button.linkish:hover:not(:disabled) {
   margin-left: 6px;
   color: var(--accent);
   font-weight: 600;
+}
+
+/* Deep-link modals: permission history / file.changed detail */
+.dl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.dl-modal {
+  width: min(720px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.dl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  padding-bottom: 6px;
+  z-index: 1;
+}
+.dl-head b { margin-right: 8px; }
+.dl-head .hint { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.dl-list { display: flex; flex-direction: column; gap: 8px; }
+.dl-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.dl-row.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.dl-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+.dl-row-head .ty { color: var(--accent); }
+.dl-row-head .tool { color: var(--ink); font-weight: 600; }
+.dl-row-head .dec { margin-left: auto; color: var(--muted); }
+.dl-row-head .dec[data-d="approved"] { color: var(--ok); }
+.dl-row-head .dec[data-d="denied"] { color: var(--err); }
+.dl-row-head .t { color: var(--muted); }
+.dl-row .sum,
+.dl-row .reason,
+.dl-row .meta {
+  color: var(--muted);
+  margin-top: 4px;
+  word-break: break-all;
+}
+.dl-row .args,
+.dl-row .diff,
+.dl-diff {
+  margin: 6px 0 0;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+  max-height: 240px;
+  overflow: auto;
+  font: inherit;
+}
+.dl-file-meta .path {
+  font-family: var(--mono);
+  color: var(--ink);
+  word-break: break-all;
+  font-weight: 600;
+}
+.dl-file-meta .meta {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.dl-subhead {
+  margin-top: 10px;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* Parallel tool batch fork visualization */

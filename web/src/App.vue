@@ -2,15 +2,20 @@
 import { computed, ref } from "vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import ExperimentPanel from "./components/ExperimentPanel.vue";
+import FileChangeModal, {
+  type FileChangeDetail,
+} from "./components/FileChangeModal.vue";
 import InspectorPanel from "./components/InspectorPanel.vue";
 import InstructionsPanel from "./components/InstructionsPanel.vue";
 import MemoryPanel from "./components/MemoryPanel.vue";
+import PermissionHistoryModal from "./components/PermissionHistoryModal.vue";
 import PlanPanel from "./components/PlanPanel.vue";
 import PermissionBar from "./components/PermissionBar.vue";
 import SessionsPanel from "./components/SessionsPanel.vue";
 import SkillsPanel from "./components/SkillsPanel.vue";
 import { useInspector } from "./composables/useInspector";
 import { useTheme } from "./theme";
+import type { RuntimeEvent } from "./types";
 
 const { theme, toggle } = useTheme();
 
@@ -51,9 +56,21 @@ const themeLabel = computed(() => (theme.value === "dark" ? "Light" : "Dark"));
 const exportBusy = ref(false);
 const openSkillName = ref("");
 const planBump = ref(0);
+const openInstructionPath = ref("");
+const permOpen = ref(false);
+const permFocus = ref<Record<string, unknown> | null>(null);
+const permEvents = ref<RuntimeEvent[]>([]);
+const fileOpen = ref(false);
+const fileDetail = ref<FileChangeDetail | null>(null);
 
-function onTimelineDeepLink(type: string, data?: Record<string, unknown>) {
+function onTimelineDeepLink(
+  type: string,
+  data?: Record<string, unknown>,
+  sourceEvents?: RuntimeEvent[],
+) {
   const name = data && data.name != null ? String(data.name) : "";
+  const d = data || {};
+
   if (type.startsWith("skill.")) {
     if (name) openSkillName.value = name;
     view.value = "skills";
@@ -62,6 +79,28 @@ function onTimelineDeepLink(type: string, data?: Record<string, unknown>) {
   if (type.startsWith("plan.")) {
     planBump.value++;
     view.value = "plan";
+    return;
+  }
+  if (type.startsWith("permission.")) {
+    permEvents.value = sourceEvents && sourceEvents.length ? sourceEvents : events.value;
+    permFocus.value = { ...d, time: d.time };
+    permOpen.value = true;
+    return;
+  }
+  if (type === "instruction.loaded") {
+    const p = String(d.rel_path || d.path || "");
+    openInstructionPath.value = p;
+    view.value = "instructions";
+    return;
+  }
+  if (type === "file.changed") {
+    fileDetail.value = {
+      path: String(d.path || ""),
+      operation: String(d.operation || ""),
+      bytes: Number(d.bytes || 0),
+      diff: String(d.diff || ""),
+    };
+    fileOpen.value = true;
   }
 }
 const toast = ref<{ text: string; kind: "ok" | "err" | "info" } | null>(null);
@@ -127,6 +166,18 @@ async function onSwitchSession(id: string) {
 <template>
   <div class="app-shell">
     <PermissionBar />
+    <PermissionHistoryModal
+      :open="permOpen"
+      :events="permEvents"
+      :focus="permFocus"
+      :time-fmt="fmtTime"
+      @close="permOpen = false"
+    />
+    <FileChangeModal
+      :open="fileOpen"
+      :detail="fileDetail"
+      @close="fileOpen = false"
+    />
     <div
       v-if="toast"
       class="toast"
@@ -254,7 +305,10 @@ async function onSwitchSession(id: string) {
       </template>
       <PlanPanel v-else-if="view === 'plan'" :bump="planBump" />
       <SkillsPanel v-else-if="view === 'skills'" :open-name="openSkillName" />
-      <InstructionsPanel v-else-if="view === 'instructions'" />
+      <InstructionsPanel
+        v-else-if="view === 'instructions'"
+        :open-path="openInstructionPath"
+      />
       <MemoryPanel v-else-if="view === 'memory'" />
       <SessionsPanel
         v-else-if="view === 'sessions'"

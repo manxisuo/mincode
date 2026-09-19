@@ -19,14 +19,9 @@ function eventClass(type: string): string {
   return "";
 }
 
+/** Full event type for Timeline labels (no A./C./L. abbreviations). */
 function shortType(type: string): string {
-  return type
-    .replace(/^tool\./, "T.")
-    .replace(/^llm\.stream_/, "L.stream.")
-    .replace(/^llm\./, "L.")
-    .replace(/^context\./, "C.")
-    .replace(/^agent\./, "A.")
-    .replace(/^permission\./, "P.");
+  return type;
 }
 
 function compact(v: unknown): string {
@@ -45,6 +40,12 @@ function previewData(data?: Record<string, unknown>): string {
   if (!data) return "";
   if (data.name != null && typeof data.name === "string") {
     return data.name;
+  }
+  if (data.operation != null && data.path != null) {
+    return `${data.operation} ${data.path}`;
+  }
+  if (data.rel_path != null) {
+    return `${data.rel_path}${data.bytes != null ? ` · ${data.bytes}B` : ""}`;
   }
   if (data.count != null && (data.preview_tail || data.total_len != null)) {
     const n = Number(data.count) || 1;

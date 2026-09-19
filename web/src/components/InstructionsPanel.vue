@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   apiInstructionsAll,
   apiInstructionsReload,
   type InstructionItem,
 } from "../instructionApi";
 import MdText from "./MdText.vue";
+
+const props = defineProps<{
+  /** Timeline deep-link: open this instruction rel_path/path when set. */
+  openPath?: string;
+}>();
 
 const items = ref<InstructionItem[]>([]);
 const composedChars = ref(0);
@@ -27,6 +32,18 @@ async function refresh() {
   }
 }
 
+function selectByPath(path: string) {
+  if (!path) return;
+  const hit =
+    items.value.find((f) => f.rel_path === path) ||
+    items.value.find((f) => f.path === path) ||
+    items.value.find(
+      (f) => path.endsWith("/" + f.rel_path) || path.endsWith("\\" + f.rel_path),
+    ) ||
+    items.value[0];
+  if (hit) selected.value = hit;
+}
+
 async function reload() {
   busy.value = true;
   error.value = "";
@@ -40,9 +57,22 @@ async function reload() {
   }
 }
 
+watch(
+  () => props.openPath,
+  (p) => {
+    if (!p) return;
+    void (async () => {
+      if (!items.value.length) await refresh();
+      selectByPath(p);
+    })();
+  },
+);
+
 let poll: number | null = null;
 onMounted(() => {
-  void refresh();
+  void refresh().then(() => {
+    if (props.openPath) selectByPath(props.openPath);
+  });
   poll = window.setInterval(() => void refresh(), 4000);
 });
 onBeforeUnmount(() => {

@@ -14,19 +14,40 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  deeplink: [type: string, data?: Record<string, unknown>];
+  deeplink: [
+    type: string,
+    data?: Record<string, unknown>,
+    sourceEvents?: RuntimeEvent[],
+  ];
 }>();
 
 function isDeeplink(e: RuntimeEvent): boolean {
+  const t = typeof e.type === "string" ? e.type : "";
   return (
-    typeof e.type === "string" &&
-    (e.type.startsWith("skill.") || e.type.startsWith("plan."))
+    t.startsWith("skill.") ||
+    t.startsWith("plan.") ||
+    t.startsWith("permission.") ||
+    t === "instruction.loaded" ||
+    t === "file.changed"
   );
+}
+
+function deeplinkTitle(e: RuntimeEvent): string | undefined {
+  if (!isDeeplink(e)) return undefined;
+  if (e.type.startsWith("permission.")) return "点击查看权限历史";
+  if (e.type === "instruction.loaded") return "跳转到 Instructions";
+  if (e.type === "file.changed") return "查看 Diff / 路径";
+  return "点击查看 Skill / Plan 详情";
 }
 
 function onTimelineClick(e: RuntimeEvent) {
   if (!isDeeplink(e)) return;
-  emit("deeplink", e.type, e.data);
+  const payload = {
+    ...(e.data || {}),
+    time: e.time,
+    id: (e.data?.id as string) || e.id,
+  } as Record<string, unknown>;
+  emit("deeplink", e.type, payload, displayEvents.value);
 }
 
 type ItemRow = {
@@ -637,7 +658,7 @@ function rawJson(e: RuntimeEvent) {
             v-else
             class="tl-item"
             :class="[eventClass(row.e.type), { deeplink: isDeeplink(row.e) }]"
-            :title="isDeeplink(row.e) ? '点击查看 Skill / Plan 详情' : undefined"
+            :title="deeplinkTitle(row.e)"
             @click="onTimelineClick(row.e)"
           >
             <template v-if="showRawJson && tlMode === 'history'">

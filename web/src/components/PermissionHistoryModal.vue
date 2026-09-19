@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import type { RuntimeEvent } from "../types";
 
 const props = defineProps<{
@@ -12,11 +12,42 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
+const modalEl = ref<HTMLElement | null>(null);
+
+const focusKey = computed(() => {
+  const f = props.focus || {};
+  return String(f.__row_key || [f.__type, f.id, f.time, f.tool].filter(Boolean).join("|"));
+});
+
+watch(
+  () => (props.open ? focusKey.value || "open" : ""),
+  async (key) => {
+    if (!key || !props.open) return;
+    await nextTick();
+    requestAnimationFrame(() => {
+      const el = modalEl.value?.querySelector(".dl-row.focused") as HTMLElement | null;
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  },
+);
+
+function eventRowKey(e: RuntimeEvent): string {
+  const d = e.data || {};
+  return [
+    e.id || "",
+    e.type || "",
+    e.time || "",
+    String(d.id || ""),
+    String(d.tool || ""),
+  ].join("|");
+}
+
 type PermRow = {
   key: string;
+  rowKey: string;
   id: string;
   time?: string;
-  type: string;
+  fullType: string;
   tool: string;
   summary: string;
   arguments: string;
@@ -28,44 +59,64 @@ type PermRow = {
 };
 
 const rows = computed<PermRow[]>(() => {
+  const focusRowKey = props.focus?.__row_key != null ? String(props.focus.__row_key) : "";
+  const focusType = props.focus?.__type != null ? String(props.focus.__type) : "";
   const focusId = props.focus?.id != null ? String(props.focus.id) : "";
   const focusTool = props.focus?.tool != null ? String(props.focus.tool) : "";
   const focusTime = props.focus?.time != null ? String(props.focus.time) : "";
+
   const out: PermRow[] = [];
+  const seen = new Set<string>();
   for (const e of props.events) {
     if (!String(e.type || "").startsWith("permission.")) continue;
     const d = e.data || {};
-    const id = String(d.id || e.id || "");
-    const tool = String(d.tool || "");
+    const rowKey = eventRowKey(e);
+    if (seen.has(rowKey)) continue;
+    seen.add(rowKey);
+    const id = String(d.id || "");
     const type = e.type.replace(/^permission\./, "");
-    const focused =
-      (focusId && id && id === focusId) ||
-      (!focusId && focusTool && tool === focusTool && focusTime && e.time === focusTime) ||
-      (!focusId && !focusTool && false);
     out.push({
-      key: `${e.id || e.time}-${e.type}-${out.length}`,
+      key: rowKey,
+      rowKey,
       id,
       time: e.time,
-      type,
-      tool,
+      fullType: e.type,
+      tool: String(d.tool || ""),
       summary: String(d.summary || ""),
       arguments: String(d.arguments || ""),
       decision: String(d.decision || type),
       reason: String(d.reason || ""),
       level: String(d.level || ""),
       diff: String(d.diff || ""),
-      focused: !!focused,
+      focused: false,
     });
   }
-  // If nothing matched focus id exactly, still show history; mark first same-tool.
-  if (focusTool && !out.some((r) => r.focused)) {
-    for (let i = out.length - 1; i >= 0; i--) {
-      if (out[i].tool === focusTool) {
-        out[i] = { ...out[i], focused: true };
-        break;
-      }
+
+  // Exactly one blue frame: prefer the precise Timeline row key.
+  if (focusRowKey) {
+    const hit = out.find((r) => r.rowKey === focusRowKey);
+    if (hit) {
+      hit.focused = true;
+      return out;
     }
   }
+
+  // Fallback when the snapshot event id/key is missing: score then pick ONE.
+  let bestIdx = -1;
+  let bestScore = -1;
+  for (let i = 0; i < out.length; i++) {
+    const r = out[i];
+    let score = 0;
+    if (focusType && r.fullType === focusType) score += 40;
+    if (focusId && r.id && r.id === focusId) score += 30;
+    if (focusTool && r.tool && r.tool === focusTool) score += 20;
+    if (focusTime && r.time && r.time === focusTime) score += 10;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx >= 0 && bestScore > 0) out[bestIdx].focused = true;
   return out;
 });
 
@@ -88,11 +139,11 @@ function prettyArgs(s: string): string {
     aria-label="权限历史"
     @click.self="emit('close')"
   >
-    <div class="dl-modal">
+    <div ref="modalEl" class="dl-modal">
       <div class="dl-head">
         <div>
           <b>权限历史</b>
-          <span class="hint">permission.* · {{ rows.length }} 条</span>
+          <span class="hint">permission.* · {{ rows.length }} 条 · 蓝框=当前点击</span>
         </div>
         <button type="button" class="linkish" @click="emit('close')">关闭</button>
       </div>
@@ -105,7 +156,7 @@ function prettyArgs(s: string): string {
           :class="{ focused: r.focused, [r.decision]: true }"
         >
           <div class="dl-row-head">
-            <span class="ty">permission.{{ r.type }}</span>
+            <span class="ty">{{ r.fullType }}</span>
             <span class="tool">{{ r.tool }}</span>
             <span class="dec" :data-d="r.decision">{{ r.decision }}</span>
             <span class="t">{{ timeFmt(r.time) }}</span>

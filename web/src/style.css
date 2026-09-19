@@ -580,7 +580,9 @@ button.linkish:hover:not(:disabled) {
 .dl-row.focused {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
 }
+/* No secondary "related" box — only the clicked row is framed. */
 .dl-row-head {
   display: flex;
   flex-wrap: wrap;

@@ -42,10 +42,22 @@ function deeplinkTitle(e: RuntimeEvent): string | undefined {
 
 function onTimelineClick(e: RuntimeEvent) {
   if (!isDeeplink(e)) return;
+  const d = e.data || {};
+  const rowKey = [
+    e.id || "",
+    e.type || "",
+    e.time || "",
+    String(d.id || ""),
+    String(d.tool || ""),
+  ].join("|");
   const payload = {
     ...(e.data || {}),
     time: e.time,
-    id: (e.data?.id as string) || e.id,
+    id: d.id != null ? String(d.id) : e.id || "",
+    tool: d.tool != null ? String(d.tool) : "",
+    __event_id: e.id,
+    __type: e.type,
+    __row_key: rowKey,
   } as Record<string, unknown>;
   emit("deeplink", e.type, payload, displayEvents.value);
 }

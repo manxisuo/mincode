@@ -332,7 +332,12 @@ async function onSwitchSession(id: string) {
           @deeplink="onTimelineDeepLink"
         />
       </template>
-      <PlanPanel v-else-if="view === 'plan'" :bump="planBump" />
+      <PlanPanel
+        v-else-if="view === 'plan'"
+        :bump="planBump"
+        :events="events"
+        :session="session"
+      />
       <SkillsPanel v-else-if="view === 'skills'" :open-name="openSkillName" />
       <InstructionsPanel
         v-else-if="view === 'instructions'"

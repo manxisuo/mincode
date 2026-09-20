@@ -7,17 +7,22 @@ import {
   apiPlanDraft,
   apiPlanReject,
 } from "../planApi";
-import type { Plan } from "../types";
+import type { Plan, RuntimeEvent, SessionInfo } from "../types";
 
 const props = defineProps<{
   /** Timeline deep-link: increment to force refresh. */
   bump?: number;
+  /** Live runtime events for plan.step_* sync. */
+  events?: RuntimeEvent[];
+  /** Current session; used to show in-flight step final. */
+  session?: SessionInfo | null;
 }>();
 
 const plan = ref<Plan | null>(null);
 const goal = ref("");
 const error = ref("");
 const busy = ref(false);
+const expandedSteps = ref<Set<number>>(new Set());
 
 const progress = computed(() => {
   if (!plan.value) return { done: 0, total: 0 };
@@ -36,6 +41,13 @@ const canCancel = computed(
   () =>
     plan.value?.status === "running" || plan.value?.status === "approved",
 );
+
+/** Live final text while the current plan step's agent turn is running. */
+const liveStepFinal = computed(() => {
+  if (!plan.value || plan.value.status !== "running") return "";
+  if (props.session?.running === false) return "";
+  return (props.session?.turn?.final || "").trim();
+});
 
 async function refresh() {
   try {
@@ -120,6 +132,58 @@ function mark(st: string): string {
   }
 }
 
+function toggleExpand(index: number) {
+  const next = new Set(expandedSteps.value);
+  if (next.has(index)) next.delete(index);
+  else next.add(index);
+  expandedSteps.value = next;
+}
+
+function isLong(text?: string): boolean {
+  return !!text && (text.length > 120 || text.includes("\n"));
+}
+
+/** Apply plan.* SSE events so step finals appear without waiting for poll. */
+function applyPlanEvents(events?: RuntimeEvent[]) {
+  if (!events?.length || !plan.value) return;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (!e.type.startsWith("plan.")) continue;
+    const d = e.data || {};
+    const planId = String(d.plan_id || "");
+    if (planId && plan.value.id && planId !== plan.value.id) continue;
+    const idx = Number(d.step_index || 0);
+    if (!idx) continue;
+    const step = plan.value.steps.find((s) => s.index === idx);
+    if (!step) continue;
+    if (e.type === "plan.step_finished" && d.result != null) {
+      step.status = "done";
+      step.result = String(d.result);
+      step.error = "";
+    } else if (e.type === "plan.step_failed" && d.error != null) {
+      step.status = "failed";
+      step.error = String(d.error);
+    } else if (e.type === "plan.step_started") {
+      step.status = "running";
+      if (Number(d.done_count) != null || d.step_count != null) {
+        /* progress shown via poll too */
+      }
+    } else if (e.type === "plan.finished") {
+      plan.value.status = "done";
+    } else if (e.type === "plan.cancelled") {
+      plan.value.status = "cancelled";
+    }
+  }
+  // Reassign for reactivity when mutating nested step fields.
+  plan.value = { ...plan.value, steps: [...plan.value.steps] };
+}
+
+watch(
+  () => props.events,
+  (ev) => applyPlanEvents(ev),
+  { deep: true },
+);
+
 defineExpose({ refresh });
 
 watch(
@@ -133,8 +197,13 @@ let poll: number | null = null;
 onMounted(() => {
   void refresh();
   poll = window.setInterval(() => {
+    // Keep polling while a plan runs even if a button click set busy.
+    if (plan.value?.status === "running" || plan.value?.status === "approved") {
+      void refresh();
+      return;
+    }
     if (!busy.value) void refresh();
-  }, 2000);
+  }, 1000);
 });
 onBeforeUnmount(() => {
   if (poll != null) window.clearInterval(poll);
@@ -210,7 +279,38 @@ onBeforeUnmount(() => {
           <span class="step-mark">{{ mark(step.status) }}</span>
           <div class="step-body">
             <div class="step-title">{{ step.index }}. {{ step.title }}</div>
-            <div v-if="step.result" class="step-note">{{ step.result }}</div>
+
+            <div
+              v-if="step.status === 'running' && liveStepFinal"
+              class="step-live"
+            >
+              <div class="step-live-label">本步进行中 · Agent 输出</div>
+              <pre class="step-final live">{{ liveStepFinal }}</pre>
+            </div>
+            <div
+              v-else-if="step.status === 'running'"
+              class="step-live-label muted"
+            >
+              执行中…
+            </div>
+
+            <div v-if="step.result" class="step-result-block">
+              <div class="step-live-label">本步 final</div>
+              <pre
+                class="step-final"
+                :class="{ open: expandedSteps.has(step.index) }"
+                :title="isLong(step.result) ? '点击展开/收起' : undefined"
+                @click="isLong(step.result) && toggleExpand(step.index)"
+              >{{ step.result }}</pre>
+              <button
+                v-if="isLong(step.result)"
+                type="button"
+                class="linkish step-expand"
+                @click="toggleExpand(step.index)"
+              >
+                {{ expandedSteps.has(step.index) ? "收起" : "展开全文" }}
+              </button>
+            </div>
             <div v-if="step.error" class="step-err">{{ step.error }}</div>
           </div>
         </li>

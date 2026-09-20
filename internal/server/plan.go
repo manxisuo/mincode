@@ -249,17 +249,20 @@ func (s *Server) runPlanSteps(ctx context.Context, p *plan.Plan) error {
 			return err
 		}
 
-		summary := strings.TrimSpace(res.Final)
-		if summary == "" {
-			summary = "ok"
+		fullFinal := strings.TrimSpace(res.Final)
+		if fullFinal == "" {
+			fullFinal = "ok"
 		}
-		summary = strutil.TruncateRunes(summary, 120)
-		_ = p.CompleteStep(step.Index, summary)
-		stepNotes = append(stepNotes, fmt.Sprintf("- Step %d (%s): %s", step.Index, step.Title, summary))
+		// Keep a short note for the next-step prompt; store a longer final
+		// so the Plan page can show what each step actually answered.
+		note := strutil.TruncateRunes(fullFinal, 120)
+		stepFinal := strutil.TruncateRunes(fullFinal, 800)
+		_ = p.CompleteStep(step.Index, stepFinal)
+		stepNotes = append(stepNotes, fmt.Sprintf("- Step %d (%s): %s", step.Index, step.Title, note))
 		done, total := p.Progress()
 		s.emitPlan(observability.EventPlanStepFinished, observability.PlanEventData{
 			PlanID: p.ID, StepIndex: step.Index, StepTitle: step.Title,
-			Result: summary, DoneCount: done, StepCount: total,
+			Result: stepFinal, DoneCount: done, StepCount: total,
 		})
 	}
 

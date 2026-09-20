@@ -1118,6 +1118,47 @@ button.linkish:hover:not(:disabled) {
   margin-top: 2px;
   white-space: pre-wrap;
 }
+.step-live-label {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+.step-live-label.muted { color: var(--muted); }
+.step-result-block { margin-top: 4px; }
+.step-final {
+  margin: 2px 0 0;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.4;
+  max-height: 4.2em;
+  overflow: hidden;
+  cursor: default;
+}
+.step-final.open,
+.step-final.live {
+  max-height: none;
+  overflow: visible;
+}
+.step-final.live {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.step-final:not(.open):not(.live)[title] { cursor: pointer; }
+.step-expand {
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+}
 .step-err {
   color: var(--err);
   margin-top: 2px;

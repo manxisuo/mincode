@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { apiTrace, apiTraces, type TraceListItem } from "../traceApi";
+import { useI18n } from "../i18n";
 import type { ContextItem, ContextSnapshot, MetricsInfo, RuntimeEvent } from "../types";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   metrics: MetricsInfo;
@@ -38,11 +41,11 @@ function isDeeplink(e: RuntimeEvent): boolean {
 
 function deeplinkTitle(e: RuntimeEvent): string | undefined {
   if (!isDeeplink(e)) return undefined;
-  if (e.type.startsWith("permission.")) return "点击查看权限历史";
-  if (e.type === "instruction.loaded") return "跳转到 Instructions";
-  if (e.type === "file.changed") return "查看 Diff / 路径";
-  if (e.type.startsWith("tool.")) return "查看工具调用详情（args / result）";
-  return "点击查看 Skill / Plan 详情";
+  if (e.type.startsWith("permission.")) return "permission history";
+  if (e.type === "instruction.loaded") return "Instructions";
+  if (e.type === "file.changed") return "Diff / path";
+  if (e.type.startsWith("tool.")) return "tool call detail (args / result)";
+  return "Skill / Plan";
 }
 
 function onTimelineClick(e: RuntimeEvent) {
@@ -451,8 +454,8 @@ function rawJson(e: RuntimeEvent) {
 <template>
   <section class="panel inspector">
     <div class="panel-head">
-      <h2>Runtime Inspector</h2>
-      <span class="hint">{{ events.length }} events</span>
+      <h2>{{ t("insp.title") }}</h2>
+      <span class="hint">{{ events.length }} {{ t("insp.events") }}</span>
     </div>
 
     <div class="metrics">
@@ -465,8 +468,8 @@ function rawJson(e: RuntimeEvent) {
 
     <div class="subhead">
       <span>
-        Context snapshot
-        <span class="hint">in order · consecutive runs folded</span>
+        {{ t("insp.ctx") }}
+        <span class="hint">{{ t("insp.ctxHint") }}</span>
       </span>
       <button
         v-if="ctxRuns.length"
@@ -474,11 +477,11 @@ function rawJson(e: RuntimeEvent) {
         class="linkish"
         @click="toggleAll()"
       >
-        {{ expanded.size > 0 ? "折叠全部" : "展开全部" }}
+        {{ expanded.size > 0 ? t("insp.collapseAll") : t("insp.expandAll") }}
       </button>
     </div>
     <div class="context">
-      <div v-if="!ctxRuns.length" class="empty">尚无快照</div>
+      <div v-if="!ctxRuns.length" class="empty">{{ t("insp.noSnap") }}</div>
       <template v-else>
         <template v-for="run in ctxRuns" :key="run.id">
           <div
@@ -512,7 +515,7 @@ function rawJson(e: RuntimeEvent) {
               }"
               :role="item.hasMore ? 'button' : undefined"
               :tabindex="item.hasMore ? 0 : undefined"
-              :title="item.hasMore && !isItemOpen(run.id, item.index) ? '点击展开 preview 全文' : undefined"
+              :title="item.hasMore && !isItemOpen(run.id, item.index) ? t('insp.clickExpand') : undefined"
               @click="item.hasMore && toggleItem(run.id, item.index)"
               @keydown.enter.prevent="item.hasMore && toggleItem(run.id, item.index)"
               @keydown.space.prevent="item.hasMore && toggleItem(run.id, item.index)"
@@ -521,10 +524,10 @@ function rawJson(e: RuntimeEvent) {
               <div class="d-meta">
                 <span class="tag">#{{ item.index }}</span>
                 <span v-if="item.role" class="tag">{{ item.role }}</span>
-                <span v-if="item.excluded" class="tag warn">excluded</span>
-                <span v-else-if="item.truncated" class="tag warn">truncated</span>
-                <span v-else class="tag ok">included</span>
-                <span v-if="item.pinned" class="tag">pinned</span>
+                <span v-if="item.excluded" class="tag warn">{{ t("insp.tagExcluded") }}</span>
+                <span v-else-if="item.truncated" class="tag warn">{{ t("insp.tagTruncated") }}</span>
+                <span v-else class="tag ok">{{ t("insp.tagIncluded") }}</span>
+                <span v-if="item.pinned" class="tag">{{ t("insp.tagPinned") }}</span>
                 <span v-if="item.reason" class="reason">{{ item.reason }}</span>
               </div>
               <div
@@ -534,11 +537,11 @@ function rawJson(e: RuntimeEvent) {
               >
                 <template v-if="isItemOpen(run.id, item.index)">
                   <pre class="d-full">{{ item.fullPreview || "—" }}</pre>
-                  <span class="d-collapse-hint">点击收起</span>
+                  <span class="d-collapse-hint">{{ t("insp.clickCollapse") }}</span>
                 </template>
                 <template v-else>
                   <span>{{ item.preview }}</span>
-                  <span v-if="item.hasMore" class="d-more">… 展开</span>
+                  <span v-if="item.hasMore" class="d-more">{{ t("insp.more") }}</span>
                 </template>
               </div>
             </div>
@@ -546,23 +549,23 @@ function rawJson(e: RuntimeEvent) {
         </template>
 
         <div class="ctx-total">
-          Total <b>{{ ctxTotal }}</b> / budget {{ snapshot?.budget ?? "-" }}
-          · step {{ snapshot?.step ?? "-" }}
-          · items {{ snapshot?.items?.length ?? 0 }}
-          · incl {{ snapshot?.included_count ?? 0 }}
-          · excl {{ snapshot?.excluded_count ?? 0 }}
+          {{ t("insp.total") }} <b>{{ ctxTotal }}</b> / {{ t("insp.budget") }} {{ snapshot?.budget ?? "-" }}
+          · {{ t("insp.step") }} {{ snapshot?.step ?? "-" }}
+          · {{ t("insp.items") }} {{ snapshot?.items?.length ?? 0 }}
+          · {{ t("insp.incl") }} {{ snapshot?.included_count ?? 0 }}
+          · {{ t("insp.excl") }} {{ snapshot?.excluded_count ?? 0 }}
         </div>
       </template>
     </div>
 
     <div class="subhead">
       <span>
-        Timeline
+        {{ t("insp.timeline") }}
         <span class="hint">
           {{
             tlMode === "live"
-              ? "live · current session"
-              : `history · ${traceId || "—"}`
+              ? t("insp.liveHint")
+              : `${t("insp.histHint")} ${traceId || "—"}`
           }}
         </span>
       </span>
@@ -573,7 +576,7 @@ function rawJson(e: RuntimeEvent) {
           :class="{ on: tlMode === 'live' }"
           @click="enterLive()"
         >
-          Live
+          {{ t("insp.live") }}
         </button>
         <button
           type="button"
@@ -581,21 +584,21 @@ function rawJson(e: RuntimeEvent) {
           :class="{ on: tlMode === 'history' }"
           @click="enterHistory()"
         >
-          History
+          {{ t("insp.history") }}
         </button>
       </div>
     </div>
 
     <div v-if="tlMode === 'history'" class="tl-history-bar">
       <select v-model="traceId" class="tl-select" @change="loadTrace()">
-        <option v-for="t in traces" :key="t.id" :value="t.id">
-          {{ t.id }}{{ t.is_current ? " (current)" : "" }}{{ t.size ? ` · ${t.size}B` : "" }}
+        <option v-for="tr in traces" :key="tr.id" :value="tr.id">
+          {{ tr.id }}{{ tr.is_current ? ` (${t("common.current")})` : "" }}{{ tr.size ? ` · ${tr.size}B` : "" }}
         </option>
       </select>
       <input
         v-model="typeFilter"
         class="tl-input"
-        placeholder="type 前缀，如 tool / llm"
+        :placeholder="t('insp.typeFilter')"
         @keyup.enter="loadTrace()"
       />
       <button
@@ -608,10 +611,10 @@ function rawJson(e: RuntimeEvent) {
           })
         "
       >
-        Reload
+        {{ t("insp.reload") }}
       </button>
       <label class="tl-raw">
-        <input v-model="showRawJson" type="checkbox" /> JSON
+        <input v-model="showRawJson" type="checkbox" /> {{ t("insp.json") }}
       </label>
     </div>
     <div v-if="tlMode === 'history' && (tlDirs.length || tlDir || histMeta.total)" class="tl-history-meta">
@@ -627,14 +630,14 @@ function rawJson(e: RuntimeEvent) {
       <div v-if="!timelineRows.length" class="empty">
         {{
           tlMode === "live"
-            ? "等待事件…"
+            ? t("insp.wait")
             : tlLoading
-              ? "加载中…"
+              ? t("insp.loading")
               : tlError
-                ? "History 加载失败（见上方错误）"
+                ? t("insp.histFail")
                 : traces.length
-                  ? `无事件（trace=${traceId || "—"}）`
-                  : `目录下无 .jsonl：${(tlDirs.length ? tlDirs : [tlDir || "…"]).join(" | ")}`
+                  ? `${t("insp.noEvents")}${traceId || "—"}`
+                  : `${t("insp.noJsonl")}${(tlDirs.length ? tlDirs : [tlDir || "…"]).join(" | ")}`
         }}
       </div>
       <template v-else>

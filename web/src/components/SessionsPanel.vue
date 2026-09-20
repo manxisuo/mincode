@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { apiSessionDelete, apiSessions, apiSessionUpdate } from "../sessionApi";
+import {
+  apiSessions,
+  apiSessionDelete,
+  apiSessionUpdate,
+} from "../sessionApi";
+import { useI18n } from "../i18n";
 import type { SessionListItem } from "../types";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   loadSession: (id: string) => Promise<void>;
@@ -75,7 +82,7 @@ async function saveEdit(id: string) {
 }
 
 async function remove(id: string) {
-  if (!window.confirm(`删除会话 ${id}？此操作不可恢复。`)) return;
+  if (!window.confirm(t("sess.confirmDelete", { id }))) return;
   busy.value = id;
   error.value = "";
   try {
@@ -109,12 +116,12 @@ onBeforeUnmount(() => {
 <template>
   <section class="panel sess-panel">
     <div class="panel-head">
-      <h2>Sessions</h2>
+      <h2>{{ t("sess.title") }}</h2>
       <div class="head-actions">
         <span class="hint">
-          current: {{ current || "—" }} · {{ items.length }} session(s)
+          {{ t("sess.current") }}: {{ current || "—" }} · {{ items.length }} {{ t("sess.count") }}
         </span>
-        <button type="button" class="linkish" @click="refresh()">Refresh</button>
+        <button type="button" class="linkish" @click="refresh()">{{ t("sess.refresh") }}</button>
       </div>
     </div>
 
@@ -123,7 +130,7 @@ onBeforeUnmount(() => {
 
     <div class="sess-list">
       <div v-if="!items.length && !error" class="empty">
-        尚无已保存会话。进行对话后会自动写入 session 存储。
+        {{ t("sess.empty") }}
       </div>
       <div
         v-for="s in items"
@@ -134,21 +141,21 @@ onBeforeUnmount(() => {
         <template v-if="editingId === s.id">
           <div class="sess-edit">
             <label class="sess-edit-label">
-              标题
+              {{ t("sess.labelTitle") }}
               <input
                 v-model="editTitle"
                 class="tl-input"
-                placeholder="会话标题（可空）"
+                :placeholder="t('sess.titlePh')"
                 maxlength="80"
               />
             </label>
             <label class="sess-edit-label">
-              备注
+              {{ t("sess.labelNote") }}
               <textarea
                 v-model="editNote"
                 class="tl-input sess-note-input"
                 rows="3"
-                placeholder="备注 / 备忘（可空）"
+                :placeholder="t('sess.notePh')"
                 maxlength="500"
               />
             </label>
@@ -159,10 +166,10 @@ onBeforeUnmount(() => {
                 :disabled="editBusy"
                 @click="saveEdit(s.id)"
               >
-                {{ editBusy ? "保存中…" : "保存" }}
+                {{ editBusy ? t("sess.saving") : t("sess.save") }}
               </button>
               <button type="button" class="linkish" :disabled="editBusy" @click="cancelEdit()">
-                取消
+                {{ t("sess.cancelEdit") }}
               </button>
             </div>
           </div>
@@ -170,12 +177,12 @@ onBeforeUnmount(() => {
         <template v-else>
           <div class="skill-name">
             {{ s.title || s.id }}
-            <span v-if="s.is_current || s.id === current" class="tag-on">current</span>
+            <span v-if="s.is_current || s.id === current" class="tag-on">{{ t("common.current") }}</span>
           </div>
           <div class="skill-path">
             <template v-if="s.title">{{ s.id }} · </template>{{ fmtTime(s.updated_at) }}
-            · turns={{ s.turns ?? 0 }}
-            · msgs={{ s.message_count ?? 0 }}
+            · {{ t("sess.turns") }}={{ s.turns ?? 0 }}
+            · {{ t("sess.msgs") }}={{ s.message_count ?? 0 }}
             <template v-if="s.model"> · {{ s.provider }}/{{ s.model }}</template>
           </div>
           <div v-if="s.note" class="sess-note">{{ s.note }}</div>
@@ -186,19 +193,19 @@ onBeforeUnmount(() => {
               :disabled="busy === s.id || s.id === current"
               @click="load(s.id)"
             >
-              {{ busy === s.id ? "加载中…" : "切换到此会话" }}
+              {{ busy === s.id ? t("sess.loading") : t("sess.load") }}
             </button>
             <button type="button" class="linkish" @click="startEdit(s)">
-              重命名 / 备注
+              {{ t("sess.rename") }}
             </button>
             <button
               type="button"
               class="linkish danger"
               :disabled="busy === s.id || s.id === current"
-              :title="s.id === current ? '不能删除当前会话' : '删除会话'"
+              :title="s.id === current ? t('sess.cannotDeleteActive') : t('sess.deleteTitle')"
               @click="remove(s.id)"
             >
-              删除
+              {{ t("sess.delete") }}
             </button>
           </div>
         </template>

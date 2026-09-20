@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { useI18n } from "../i18n";
 import {
   apiDecidePermission,
   apiPendingPermissions,
 } from "../permissionApi";
 import type { PendingPermission } from "../types";
+
+const { t } = useI18n();
 
 const pending = ref<PendingPermission[]>([]);
 const busy = ref(false);
@@ -89,8 +92,8 @@ defineExpose({ refresh });
   <div v-if="pending.length" class="perm-overlay" role="dialog" aria-modal="true">
     <div class="perm-card">
       <div class="perm-head">
-        <b>Permission required</b>
-        <span class="hint">Ask 级工具等待批准 · 超时 2 分钟将拒绝</span>
+        <b>{{ t("perm.title") }}</b>
+        <span class="hint">{{ t("perm.hint") }}</span>
       </div>
       <div v-if="error" class="exp-error">{{ error }}</div>
       <div v-for="p in pending" :key="p.id" class="perm-item">
@@ -99,7 +102,6 @@ defineExpose({ refresh });
           <span class="perm-sum">{{ p.summary || argsPreview(p) }}</span>
         </div>
         <div v-if="p.diff" class="perm-diff">
-          <!-- eslint-disable-next-line vue/no-v-html — HTML escaped per line -->
           <pre v-html="diffHtml(p.diff)"></pre>
         </div>
         <div v-else-if="p.arguments" class="perm-args">
@@ -112,10 +114,10 @@ defineExpose({ refresh });
             :disabled="busy"
             @click="decide(p, true)"
           >
-            Allow
+            {{ t("perm.allow") }}
           </button>
           <button type="button" :disabled="busy" @click="decide(p, false)">
-            Deny
+            {{ t("perm.deny") }}
           </button>
         </div>
       </div>

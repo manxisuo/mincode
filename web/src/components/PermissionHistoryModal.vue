@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { useI18n } from "../i18n";
 import type { RuntimeEvent } from "../types";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   open: boolean;
@@ -136,18 +139,18 @@ function prettyArgs(s: string): string {
     class="dl-overlay"
     role="dialog"
     aria-modal="true"
-    aria-label="权限历史"
+    aria-label="permission history"
     @click.self="emit('close')"
   >
     <div ref="modalEl" class="dl-modal">
       <div class="dl-head">
         <div>
-          <b>权限历史</b>
-          <span class="hint">permission.* · {{ rows.length }} 条 · 蓝框=当前点击</span>
+          <b>{{ t("permHistory.title") }}</b>
+          <span class="hint">{{ t("permHistory.hint", { n: rows.length }) }}</span>
         </div>
-        <button type="button" class="linkish" @click="emit('close')">关闭</button>
+        <button type="button" class="linkish" @click="emit('close')">{{ t("permHistory.close") }}</button>
       </div>
-      <div v-if="!rows.length" class="empty">尚无 permission 事件</div>
+      <div v-if="!rows.length" class="empty">{{ t("permHistory.empty") }}</div>
       <div v-else class="dl-list">
         <div
           v-for="r in rows"

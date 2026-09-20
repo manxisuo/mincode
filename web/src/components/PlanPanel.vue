@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "../i18n";
 import {
   apiPlan,
   apiPlanApprove,
@@ -8,6 +9,8 @@ import {
   apiPlanReject,
 } from "../planApi";
 import type { Plan, RuntimeEvent, SessionInfo } from "../types";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   /** Timeline deep-link: increment to force refresh. */
@@ -61,7 +64,7 @@ async function refresh() {
 async function draft() {
   const g = goal.value.trim();
   if (!g) {
-    error.value = "请填写 plan goal";
+    error.value = t("plan.needGoal");
     return;
   }
   busy.value = true;
@@ -213,9 +216,9 @@ onBeforeUnmount(() => {
 <template>
   <section class="panel plan-panel">
     <div class="panel-head">
-      <h2>Plan</h2>
+      <h2>{{ t("plan.title") }}</h2>
       <button type="button" class="linkish" :disabled="busy" @click="refresh()">
-        Refresh
+        {{ t("plan.refresh") }}
       </button>
     </div>
 
@@ -223,19 +226,19 @@ onBeforeUnmount(() => {
       <input
         v-model="goal"
         class="tl-input plan-goal"
-        placeholder="例如：分析项目入口并补一个 /health 测试"
+        :placeholder="t('plan.goalPh')"
         :disabled="busy"
         @keyup.enter="draft()"
       />
       <button type="button" class="primary" :disabled="busy" @click="draft()">
-        Draft
+        {{ t("plan.draft") }}
       </button>
     </div>
 
     <div v-if="error" class="exp-error">{{ error }}</div>
 
     <div v-if="!plan" class="empty plan-empty">
-      尚无计划。输入 goal 后点 Draft，模型会生成步骤列表；确认后 Approve 执行。
+      {{ t("plan.empty") }}
     </div>
 
     <div v-else class="plan-body">
@@ -246,8 +249,8 @@ onBeforeUnmount(() => {
         </div>
         <div class="plan-goal-text">{{ plan.goal }}</div>
         <div class="plan-progress">
-          steps {{ progress.done }}/{{ progress.total }}
-          <template v-if="plan.current"> · current #{{ plan.current }}</template>
+          {{ t("plan.steps") }} {{ progress.done }}/{{ progress.total }}
+          <template v-if="plan.current"> · {{ t("plan.current") }} #{{ plan.current }}</template>
         </div>
       </div>
 
@@ -259,13 +262,13 @@ onBeforeUnmount(() => {
           :disabled="busy"
           @click="approve()"
         >
-          Approve & Run
+          {{ t("plan.approve") }}
         </button>
         <button v-if="canReject" type="button" :disabled="busy" @click="reject()">
-          Reject
+          {{ t("plan.reject") }}
         </button>
         <button v-if="canCancel" type="button" :disabled="busy" @click="cancel()">
-          Cancel
+          {{ t("plan.cancel") }}
         </button>
       </div>
 
@@ -284,22 +287,22 @@ onBeforeUnmount(() => {
               v-if="step.status === 'running' && liveStepFinal"
               class="step-live"
             >
-              <div class="step-live-label">本步进行中 · Agent 输出</div>
+              <div class="step-live-label">{{ t("plan.liveLabel") }}</div>
               <pre class="step-final live">{{ liveStepFinal }}</pre>
             </div>
             <div
               v-else-if="step.status === 'running'"
               class="step-live-label muted"
             >
-              执行中…
+              {{ t("plan.running") }}
             </div>
 
             <div v-if="step.result" class="step-result-block">
-              <div class="step-live-label">本步 final</div>
+              <div class="step-live-label">{{ t("plan.finalLabel") }}</div>
               <pre
                 class="step-final"
                 :class="{ open: expandedSteps.has(step.index) }"
-                :title="isLong(step.result) ? '点击展开/收起' : undefined"
+                :title="isLong(step.result) ? t('plan.expand') : undefined"
                 @click="isLong(step.result) && toggleExpand(step.index)"
               >{{ step.result }}</pre>
               <button
@@ -308,7 +311,7 @@ onBeforeUnmount(() => {
                 class="linkish step-expand"
                 @click="toggleExpand(step.index)"
               >
-                {{ expandedSteps.has(step.index) ? "收起" : "展开全文" }}
+                {{ expandedSteps.has(step.index) ? t("plan.collapse") : t("plan.expand") }}
               </button>
             </div>
             <div v-if="step.error" class="step-err">{{ step.error }}</div>

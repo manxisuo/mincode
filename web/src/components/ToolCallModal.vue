@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "../i18n";
+
+const { t } = useI18n();
 
 export interface ToolCallDetail {
   type: string;
@@ -73,7 +76,7 @@ const outputLines = computed(() => {
     class="dl-overlay"
     role="dialog"
     aria-modal="true"
-    aria-label="工具调用详情"
+    aria-label="tool call detail"
     @click.self="emit('close')"
   >
     <div class="dl-modal">
@@ -85,7 +88,7 @@ const outputLines = computed(() => {
             <template v-if="detail.time"> · {{ timeFmt(detail.time) }}</template>
           </span>
         </div>
-        <button type="button" class="linkish" @click="emit('close')">关闭</button>
+        <button type="button" class="linkish" @click="emit('close')">{{ t("toolModal.close") }}</button>
       </div>
 
       <div class="tool-meta">
@@ -97,8 +100,8 @@ const outputLines = computed(() => {
         <span v-if="detail.callId" class="meta mono" :title="detail.callId">{{ detail.callId }}</span>
       </div>
 
-      <div class="dl-subhead">Arguments</div>
-      <div v-if="!argRows.length" class="empty">无参数</div>
+      <div class="dl-subhead">{{ t("toolModal.args") }}</div>
+      <div v-if="!argRows.length" class="empty">{{ t("toolModal.noArgs") }}</div>
       <table v-else class="tool-args">
         <tbody>
           <tr v-for="r in argRows" :key="r.key">
@@ -109,14 +112,14 @@ const outputLines = computed(() => {
       </table>
 
       <div class="dl-subhead">
-        {{ detail.isError || detail.type === "tool.failed" ? "Error" : "Result preview" }}
+        {{ detail.isError || detail.type === "tool.failed" ? t("toolModal.error") : t("toolModal.result") }}
       </div>
       <pre
         class="tool-out"
         :class="{ err: detail.isError || detail.type === 'tool.failed' }"
-      >{{ outputLines || "—" }}</pre>
+      >{{ outputLines || t("toolModal.emptyOut") }}</pre>
       <div v-if="detail.resultSize && detail.outputPreview && detail.outputPreview.length < detail.resultSize" class="hint tool-trunc">
-        事件里仅含预览（{{ detail.outputPreview.length }} / {{ detail.resultSize }} 字符）；完整结果见 Context snapshot 或 History JSON
+        {{ t("toolModal.trunc", { a: detail.outputPreview.length, b: detail.resultSize }) }}
       </div>
     </div>
   </div>

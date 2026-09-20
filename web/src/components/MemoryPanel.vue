@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { useI18n } from "../i18n";
 import { apiMemory, apiMemoryAdd } from "../memoryApi";
 import MdText from "./MdText.vue";
+
+const { t } = useI18n();
 
 const content = ref("");
 const path = ref("");
@@ -31,7 +34,7 @@ async function refresh() {
 async function add() {
   const fact = entry.value.trim();
   if (!fact) {
-    error.value = "请输入要记住的事实";
+    error.value = t("mem.needFact");
     return;
   }
   busy.value = true;
@@ -63,12 +66,12 @@ onBeforeUnmount(() => {
 <template>
   <section class="panel mem-panel">
     <div class="panel-head">
-      <h2>Memory</h2>
+      <h2>{{ t("mem.title") }}</h2>
       <div class="head-actions">
         <span class="hint">
-          {{ fileName }} · {{ entries }} entries · {{ composedChars }} chars in context
+          {{ fileName }} · {{ entries }} {{ t("mem.entries") }} · {{ composedChars }} {{ t("mem.charsInCtx") }}
         </span>
-        <button type="button" class="linkish" @click="refresh()">Refresh</button>
+        <button type="button" class="linkish" @click="refresh()">{{ t("mem.refresh") }}</button>
       </div>
     </div>
 
@@ -79,18 +82,18 @@ onBeforeUnmount(() => {
       <input
         v-model="entry"
         class="tl-input"
-        placeholder="新增跨会话事实，例如：测试入口在 cmd/mincode/main.go"
+        :placeholder="t('mem.ph')"
         :disabled="busy"
         @keyup.enter="add()"
       />
       <button type="button" class="primary" :disabled="busy" @click="add()">
-        Add
+        {{ t("mem.add") }}
       </button>
     </div>
 
     <div class="mem-body">
       <div v-if="!content && !error" class="empty">
-        尚无记忆 — 可在上方添加，或在 CLI 使用
+        {{ t("mem.empty") }}
         <code>/memory add &lt;fact&gt;</code>
       </div>
       <div v-else class="skills-md mem-md">

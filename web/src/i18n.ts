@@ -1,0 +1,384 @@
+import { computed, ref } from "vue";
+
+export type Locale = "zh-CN" | "en-US";
+
+const STORAGE_KEY = "mincode-locale";
+
+/** Shared key set — en-US is the source of truth for keys. */
+const enUS = {
+  "app.brand": "MinCode Inspector",
+  "app.connecting": "connecting…",
+  "app.theme.toDark": "Switch to Dark theme",
+  "app.theme.toLight": "Switch to Light theme",
+  "app.theme.dark": "Dark",
+  "app.theme.light": "Light",
+  "app.export.title": "Export to workspace/exports/*.md",
+  "app.export.mdTitle": "Download Markdown in browser",
+  "app.export.btn": "Export",
+  "app.export.ok": "Markdown download started",
+  "app.export.done": "Export succeeded",
+  "app.export.fail": "Export failed",
+  "app.cancel": "Cancel",
+  "app.lang": "Language",
+  "nav.inspector": "Inspector",
+  "nav.plan": "Plan",
+  "nav.skills": "Skills",
+  "nav.instructions": "Instructions",
+  "nav.memory": "Memory",
+  "nav.sessions": "Sessions",
+  "nav.experiments": "Experiments",
+  "chat.title": "Conversation",
+  "chat.hint": "Local Web · Markdown",
+  "chat.placeholder":
+    "Type a message (Markdown ok), e.g. **analyze** this project's entrypoint.",
+  "chat.send": "Send",
+  "chat.connectFail": "Cannot reach API — run mincode web first",
+  "chat.sse": "SSE connected",
+  "chat.restored": "restored session",
+  "chat.cancelReq": "cancel requested",
+  "chat.nothingCancel": "nothing to cancel",
+  "chat.batch": "parallel batch",
+  "insp.title": "Runtime Inspector",
+  "insp.events": "events",
+  "insp.ctx": "Context snapshot",
+  "insp.ctxHint":
+    "in order · consecutive runs folded · click a Run, then “… expand” for full preview",
+  "insp.expandAll": "Expand all",
+  "insp.collapseAll": "Collapse all",
+  "insp.noSnap": "No snapshot yet",
+  "insp.total": "Total",
+  "insp.budget": "budget",
+  "insp.step": "step",
+  "insp.items": "items",
+  "insp.incl": "incl",
+  "insp.excl": "excl",
+  "insp.timeline": "Timeline",
+  "insp.live": "Live",
+  "insp.history": "History",
+  "insp.liveHint": "live · current session",
+  "insp.histHint": "history ·",
+  "insp.wait": "Waiting for events…",
+  "insp.loading": "Loading…",
+  "insp.histFail": "History load failed (see error above)",
+  "insp.noEvents": "No events (trace=",
+  "insp.noJsonl": "No .jsonl in dir: ",
+  "insp.reload": "Reload",
+  "insp.json": "JSON",
+  "insp.batch": "parallel batch",
+  "insp.clickExpand": "Click to expand full preview",
+  "insp.clickCollapse": "Click to collapse",
+  "insp.more": "… expand",
+  "insp.tagExcluded": "excluded",
+  "insp.tagTruncated": "truncated",
+  "insp.tagIncluded": "included",
+  "insp.tagPinned": "pinned",
+  "insp.typeFilter": "type prefix, e.g. tool / llm",
+  "plan.title": "Plan",
+  "plan.refresh": "Refresh",
+  "plan.goalPh": "e.g. analyze project entry and add a /health test",
+  "plan.draft": "Draft",
+  "plan.needGoal": "Please enter a plan goal",
+  "plan.empty": "No plan yet. Enter a goal and Draft; approve to run.",
+  "plan.steps": "steps",
+  "plan.current": "current",
+  "plan.approve": "Approve & Run",
+  "plan.reject": "Reject",
+  "plan.cancel": "Cancel plan",
+  "plan.liveLabel": "Step in progress · Agent output",
+  "plan.running": "Running…",
+  "plan.finalLabel": "Step final",
+  "plan.expand": "Expand",
+  "plan.collapse": "Collapse",
+  "skills.title": "Skills",
+  "skills.available": "available",
+  "skills.refresh": "Refresh",
+  "skills.inContext": "in context",
+  "skills.empty": "no skills found — put them in",
+  "skills.deactivate": "Deactivate",
+  "skills.activate": "Activate",
+  "skills.detailEmpty":
+    "Select a skill on the left to view SKILL.md; Activate injects context (same as",
+  "skills.close": "Close",
+  "instr.title": "Instructions",
+  "instr.reload": "Reload",
+  "instr.composed": "composed: chars injected as system context",
+  "instr.empty": "No instructions loaded — add under workspace",
+  "instr.detailEmpty": "Select AGENTS.md on the left (same as CLI",
+  "instr.close": "Close",
+  "mem.title": "Memory",
+  "mem.refresh": "Refresh",
+  "mem.entries": "entries",
+  "mem.charsInCtx": "chars in context",
+  "mem.add": "Add",
+  "mem.ph":
+    "Add a cross-session fact, e.g. test entry is cmd/mincode/main.go",
+  "mem.needFact": "Please enter a fact to remember",
+  "mem.empty": "No memory yet — add above, or use in CLI",
+  "sess.title": "Sessions",
+  "sess.current": "current",
+  "sess.count": "session(s)",
+  "sess.refresh": "Refresh",
+  "sess.empty": "No saved sessions yet. Conversations are written automatically.",
+  "sess.load": "Switch to session",
+  "sess.loading": "Loading…",
+  "sess.rename": "Rename / Note",
+  "sess.delete": "Delete",
+  "sess.deleteTitle": "Delete session",
+  "sess.cannotDeleteActive": "Cannot delete the active session",
+  "sess.confirmDelete": "Delete session {id}? This cannot be undone.",
+  "sess.labelTitle": "Title",
+  "sess.labelNote": "Note",
+  "sess.titlePh": "Session title (optional)",
+  "sess.notePh": "Note / memo (optional)",
+  "sess.save": "Save",
+  "sess.saving": "Saving…",
+  "sess.cancelEdit": "Cancel",
+  "sess.turns": "turns",
+  "sess.msgs": "msgs",
+  "perm.title": "Permission required",
+  "perm.hint": "Ask-level tool waiting · times out in 2 minutes",
+  "perm.allow": "Allow",
+  "perm.deny": "Deny",
+  "permHistory.title": "Permission history",
+  "permHistory.hint": "permission.* · {n} · blue frame = clicked item",
+  "permHistory.empty": "No permission events yet",
+  "permHistory.close": "Close",
+  "fileModal.close": "Close",
+  "fileModal.title": "file.changed",
+  "fileModal.noDiff": "No diff in this event (likely create/overwrite)",
+  "fileModal.diff": "Diff",
+  "toolModal.close": "Close",
+  "toolModal.args": "Arguments",
+  "toolModal.noArgs": "No arguments",
+  "toolModal.result": "Result preview",
+  "toolModal.error": "Error",
+  "toolModal.emptyOut": "—",
+  "toolModal.trunc":
+    "Event preview only ({a} / {b} chars); full result in Context snapshot or History JSON",
+  "toolModal.title": "Tool call detail",
+  "common.current": "current",
+  "common.active": "active",
+  "common.finished": "finished",
+  "common.failed": "failed",
+  "exp.title": "Experiment Dashboard",
+  "exp.refresh": "Refresh",
+  "exp.empty": "No experiment data yet",
+};
+
+const zhCN: Record<keyof typeof enUS, string> = {
+  "app.brand": "MinCode Inspector",
+  "app.connecting": "连接中…",
+  "app.theme.toDark": "切换到深色主题",
+  "app.theme.toLight": "切换到浅色主题",
+  "app.theme.dark": "深色",
+  "app.theme.light": "浅色",
+  "app.export.title": "导出到 workspace/exports/*.md",
+  "app.export.mdTitle": "在浏览器中下载 Markdown",
+  "app.export.btn": "导出",
+  "app.export.ok": "已开始下载 Markdown",
+  "app.export.done": "导出成功",
+  "app.export.fail": "导出失败",
+  "app.cancel": "取消",
+  "app.lang": "界面语言",
+  "nav.inspector": "巡检",
+  "nav.plan": "计划",
+  "nav.skills": "技能",
+  "nav.instructions": "指令",
+  "nav.memory": "记忆",
+  "nav.sessions": "会话",
+  "nav.experiments": "实验",
+  "chat.title": "对话",
+  "chat.hint": "本地 Web · Markdown",
+  "chat.placeholder": "输入消息（支持 Markdown），例如：**分析**这个项目的入口。",
+  "chat.send": "发送",
+  "chat.connectFail": "无法连接 API — 请先运行 mincode web",
+  "chat.sse": "SSE 已连接",
+  "chat.restored": "已恢复会话",
+  "chat.cancelReq": "已请求取消",
+  "chat.nothingCancel": "没有可取消的任务",
+  "chat.batch": "并行批次",
+  "insp.title": "运行时巡检",
+  "insp.events": "条事件",
+  "insp.ctx": "上下文快照",
+  "insp.ctxHint": "按顺序 · 连续同源折叠 · 点 Run 展开明细，再点「… 展开」看 preview 全文",
+  "insp.expandAll": "展开全部",
+  "insp.collapseAll": "折叠全部",
+  "insp.noSnap": "尚无快照",
+  "insp.total": "合计",
+  "insp.budget": "预算",
+  "insp.step": "步",
+  "insp.items": "项",
+  "insp.incl": "含",
+  "insp.excl": "排",
+  "insp.timeline": "时间线",
+  "insp.live": "实时",
+  "insp.history": "历史",
+  "insp.liveHint": "实时 · 当前会话",
+  "insp.histHint": "历史 ·",
+  "insp.wait": "等待事件…",
+  "insp.loading": "加载中…",
+  "insp.histFail": "历史加载失败（见上方错误）",
+  "insp.noEvents": "无事件（trace=",
+  "insp.noJsonl": "目录下无 .jsonl：",
+  "insp.reload": "重新加载",
+  "insp.json": "JSON",
+  "insp.batch": "并行批次",
+  "insp.clickExpand": "点击展开 preview 全文",
+  "insp.clickCollapse": "点击收起",
+  "insp.more": "… 展开",
+  "insp.tagExcluded": "已排除",
+  "insp.tagTruncated": "已截断",
+  "insp.tagIncluded": "已纳入",
+  "insp.tagPinned": "已固定",
+  "insp.typeFilter": "类型前缀，如 tool / llm",
+  "plan.title": "计划",
+  "plan.refresh": "刷新",
+  "plan.goalPh": "例如：分析项目入口并补一个 /health 测试",
+  "plan.draft": "生成草案",
+  "plan.needGoal": "请填写计划目标",
+  "plan.empty": "尚无计划。输入目标后点「生成草案」，模型会列出步骤；确认后「批准并执行」。",
+  "plan.steps": "步骤",
+  "plan.current": "当前",
+  "plan.approve": "批准并执行",
+  "plan.reject": "拒绝",
+  "plan.cancel": "取消计划",
+  "plan.liveLabel": "本步进行中 · Agent 输出",
+  "plan.running": "执行中…",
+  "plan.finalLabel": "本步 final",
+  "plan.expand": "展开全文",
+  "plan.collapse": "收起",
+  "skills.title": "技能",
+  "skills.available": "个可用",
+  "skills.refresh": "刷新",
+  "skills.inContext": "已注入上下文",
+  "skills.empty": "未找到技能 — 请放入",
+  "skills.deactivate": "停用",
+  "skills.activate": "激活",
+  "skills.detailEmpty": "选择左侧技能查看 SKILL.md；点「激活」注入 Context（等价",
+  "skills.close": "关闭",
+  "instr.title": "指令",
+  "instr.reload": "重新加载",
+  "instr.composed": "已组合：注入 system context 的字符数",
+  "instr.empty": "未加载指令 — 在 workspace 下添加",
+  "instr.detailEmpty": "左侧选择 AGENTS.md 查看全文（等价 CLI",
+  "instr.close": "关闭",
+  "mem.title": "记忆",
+  "mem.refresh": "刷新",
+  "mem.entries": "条",
+  "mem.charsInCtx": "context 中字符",
+  "mem.add": "添加",
+  "mem.ph": "新增跨会话事实，例如：测试入口在 cmd/mincode/main.go",
+  "mem.needFact": "请输入要记住的事实",
+  "mem.empty": "尚无记忆 — 可在上方添加，或在 CLI 使用",
+  "sess.title": "会话",
+  "sess.current": "当前",
+  "sess.count": "个会话",
+  "sess.refresh": "刷新",
+  "sess.empty": "尚无已保存会话。进行对话后会自动写入 session 存储。",
+  "sess.load": "切换到此会话",
+  "sess.loading": "加载中…",
+  "sess.rename": "重命名 / 备注",
+  "sess.delete": "删除",
+  "sess.deleteTitle": "删除会话",
+  "sess.cannotDeleteActive": "不能删除当前会话",
+  "sess.confirmDelete": "删除会话 {id}？此操作不可恢复。",
+  "sess.labelTitle": "标题",
+  "sess.labelNote": "备注",
+  "sess.titlePh": "会话标题（可空）",
+  "sess.notePh": "备注 / 备忘（可空）",
+  "sess.save": "保存",
+  "sess.saving": "保存中…",
+  "sess.cancelEdit": "取消",
+  "sess.turns": "轮次",
+  "sess.msgs": "消息",
+  "perm.title": "需要权限",
+  "perm.hint": "Ask 级工具等待批准 · 超时 2 分钟将拒绝",
+  "perm.allow": "允许",
+  "perm.deny": "拒绝",
+  "permHistory.title": "权限历史",
+  "permHistory.hint": "permission.* · {n} 条 · 蓝框=当前点击",
+  "permHistory.empty": "尚无 permission 事件",
+  "permHistory.close": "关闭",
+  "fileModal.close": "关闭",
+  "fileModal.title": "文件变更",
+  "fileModal.noDiff": "该事件未携带 diff（可能为 create/overwrite 全量写入）",
+  "fileModal.diff": "Diff",
+  "toolModal.close": "关闭",
+  "toolModal.args": "参数",
+  "toolModal.noArgs": "无参数",
+  "toolModal.result": "结果预览",
+  "toolModal.error": "错误",
+  "toolModal.emptyOut": "—",
+  "toolModal.trunc":
+    "事件里仅含预览（{a} / {b} 字符）；完整结果见 Context snapshot 或 History JSON",
+  "toolModal.title": "工具调用详情",
+  "common.current": "当前",
+  "common.active": "已激活",
+  "common.finished": "完成",
+  "common.failed": "失败",
+  "exp.title": "实验看板",
+  "exp.refresh": "刷新",
+  "exp.empty": "尚无实验数据",
+};
+
+const dict = {
+  "zh-CN": zhCN,
+  "en-US": enUS,
+} as const;
+
+export type MessageKey = keyof typeof enUS;
+
+function detectLocale(): Locale {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "zh-CN" || stored === "en-US") return stored;
+  } catch {
+    /* ignore */
+  }
+  if (typeof navigator !== "undefined" && /^zh\b/i.test(navigator.language || "")) {
+    return "zh-CN";
+  }
+  return "en-US";
+}
+
+const locale = ref<Locale>(detectLocale());
+
+export function setLocale(next: Locale) {
+  locale.value = next;
+  document.documentElement.setAttribute("lang", next);
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function toggleLocale() {
+  setLocale(locale.value === "zh-CN" ? "en-US" : "zh-CN");
+}
+
+function lookup(key: string, vars?: Record<string, string | number>): string {
+  const pack = (dict[locale.value] || enUS) as Record<string, string>;
+  const fallback = enUS as Record<string, string>;
+  let s = pack[key] ?? fallback[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      s = s.replaceAll(`{${k}}`, String(v));
+    }
+  }
+  return s;
+}
+
+/** Translate a UI key; optional {var} interpolation. */
+export function t(
+  key: MessageKey | string,
+  vars?: Record<string, string | number>,
+): string {
+  return lookup(key, vars);
+}
+
+export function useI18n() {
+  const langLabel = computed(() => (locale.value === "zh-CN" ? "中文" : "EN"));
+  document.documentElement.setAttribute("lang", locale.value);
+  return { locale, t, setLocale, toggleLocale, langLabel };
+}

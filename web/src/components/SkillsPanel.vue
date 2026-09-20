@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "../i18n";
 import {
   apiSkill,
   apiSkillActivate,
@@ -8,6 +9,8 @@ import {
 } from "../skillApi";
 import type { SkillDetail, SkillListItem } from "../types";
 import MdText from "./MdText.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   /** Timeline deep-link: open this skill name when set/changed. */
@@ -101,23 +104,23 @@ onBeforeUnmount(() => {
 <template>
   <section class="panel skills-panel">
     <div class="panel-head">
-      <h2>Skills</h2>
+      <h2>{{ t("skills.title") }}</h2>
       <div class="head-actions">
-        <span class="hint">{{ skillsDir }} · {{ skills.length }} available</span>
-        <button type="button" class="linkish" @click="refresh()">Refresh</button>
+        <span class="hint">{{ skillsDir }} · {{ skills.length }} {{ t("skills.available") }}</span>
+        <button type="button" class="linkish" @click="refresh()">{{ t("skills.refresh") }}</button>
       </div>
     </div>
 
     <div v-if="error" class="exp-error">{{ error }}</div>
     <div v-if="skillsDirAbs" class="skills-meta">
-      dir: {{ skillsDirAbs }} · in context: {{ activeCount }} skill(s),
+      dir: {{ skillsDirAbs }} · {{ t("skills.inContext") }}: {{ activeCount }} skill(s),
       {{ contextChars }} chars
     </div>
 
     <div class="skills-body">
       <div class="skills-list">
         <div v-if="!skills.length && !error" class="empty">
-          no skills found — put them in
+          {{ t("skills.empty") }}
           <code>skills/&lt;name&gt;/SKILL.md</code>
         </div>
         <div
@@ -133,7 +136,7 @@ onBeforeUnmount(() => {
           <div class="skill-name">
             <span class="mark">{{ sk.active ? "●" : "○" }}</span>
             {{ sk.name }}
-            <span v-if="sk.active" class="tag-on">active</span>
+            <span v-if="sk.active" class="tag-on">{{ t("common.active") }}</span>
           </div>
           <div v-if="sk.summary" class="skill-sum">{{ sk.summary }}</div>
           <div class="skill-path">{{ sk.rel_path }} · {{ sk.bytes }}B</div>
@@ -144,7 +147,7 @@ onBeforeUnmount(() => {
               :disabled="busyName === sk.name"
               @click="toggleActive(sk.name, !!sk.active, $event)"
             >
-              {{ sk.active ? "停用" : "激活" }}
+              {{ sk.active ? t("skills.deactivate") : t("skills.activate") }}
             </button>
           </div>
         </div>
@@ -152,14 +155,14 @@ onBeforeUnmount(() => {
 
       <div class="skills-detail">
         <div v-if="!selected" class="empty">
-          选择左侧 skill 查看 SKILL.md；点「激活」注入 Context（等价
-          <code>/skill &lt;name&gt;</code>）
+          {{ t("skills.detailEmpty") }}
+          <code>/skill &lt;name&gt;</code>
         </div>
         <template v-else>
           <div class="skills-detail-head">
             <div>
               <b>{{ selected.name }}</b>
-              <span v-if="selected.active" class="tag-on">active</span>
+              <span v-if="selected.active" class="tag-on">{{ t("common.active") }}</span>
               <div class="hint">{{ selected.rel_path }}</div>
             </div>
             <div class="skill-actions">
@@ -168,10 +171,10 @@ onBeforeUnmount(() => {
                 :disabled="busyName === selected.name"
                 @click="toggleActive(selected.name, !!selected.active)"
               >
-                {{ selected.active ? "停用" : "激活" }}
+                {{ selected.active ? t("skills.deactivate") : t("skills.activate") }}
               </button>
               <button type="button" class="linkish" @click="closeDetail()">
-                关闭
+                {{ t("skills.close") }}
               </button>
             </div>
           </div>

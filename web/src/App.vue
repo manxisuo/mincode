@@ -16,11 +16,13 @@ import SkillsPanel from "./components/SkillsPanel.vue";
 import ToolCallModal, {
   type ToolCallDetail,
 } from "./components/ToolCallModal.vue";
+import { useI18n } from "./i18n";
 import { useInspector } from "./composables/useInspector";
 import { useTheme } from "./theme";
 import type { RuntimeEvent } from "./types";
 
 const { theme, toggle } = useTheme();
+const { t, toggleLocale, langLabel } = useI18n();
 
 const {
   messages,
@@ -52,10 +54,16 @@ const stateLabel = computed(() => session.value?.state || "IDLE");
 const running = computed(() => !!session.value?.running);
 const meta = computed(() => {
   const s = session.value;
-  if (!s) return "connecting…";
+  if (!s) return t("app.connecting");
   return `${s.session_id} · ${s.provider}/${s.model} · ${s.workspace}`;
 });
-const themeLabel = computed(() => (theme.value === "dark" ? "Light" : "Dark"));
+const themeLabel = computed(() =>
+  theme.value === "dark" ? t("app.theme.dark") : t("app.theme.light"),
+);
+const themeIcon = computed(() => (theme.value === "dark" ? "🌙" : "☀️"));
+const themeTitle = computed(() =>
+  theme.value === "dark" ? t("app.theme.toLight") : t("app.theme.toDark"),
+);
 const exportBusy = ref(false);
 const openSkillName = ref("");
 const planBump = ref(0);
@@ -142,7 +150,7 @@ async function exportMarkdown(download: boolean) {
   if (download) {
     try {
       window.open("/api/export/download", "_blank");
-      showToast("已开始下载 Markdown", "ok");
+      showToast(t("app.export.ok"), "ok");
     } catch (e) {
       showToast(String((e as Error).message || e), "err");
     }
@@ -159,12 +167,12 @@ async function exportMarkdown(download: boolean) {
       error?: string;
     };
     if (!res.ok || !data.ok) {
-      showToast(data.error || res.statusText || "export failed", "err");
+      showToast(data.error || res.statusText || t("app.export.fail"), "err");
       return;
     }
     const target = data.rel || data.path || "";
     const n = data.bytes != null ? ` · ${data.bytes}B` : "";
-    showToast(`导出成功：${target}${n}`, "ok");
+    showToast(`${t("app.export.done")}: ${target}${n}`, "ok");
   } catch (e) {
     showToast(String((e as Error).message || e), "err");
   } finally {
@@ -220,7 +228,7 @@ async function onSwitchSession(id: string) {
       <div class="brand">
         <span class="logo">MC</span>
         <div>
-          <strong>MinCode Inspector</strong>
+          <strong>{{ t("app.brand") }}</strong>
           <div class="meta">{{ meta }}</div>
         </div>
       </div>
@@ -231,73 +239,76 @@ async function onSwitchSession(id: string) {
             :class="{ active: view === 'inspector' }"
             @click="view = 'inspector'"
           >
-            Inspector
+            {{ t("nav.inspector") }}
           </button>
           <button
             type="button"
             :class="{ active: view === 'plan' }"
             @click="view = 'plan'"
           >
-            Plan
+            {{ t("nav.plan") }}
           </button>
           <button
             type="button"
             :class="{ active: view === 'skills' }"
             @click="view = 'skills'"
           >
-            Skills
+            {{ t("nav.skills") }}
           </button>
           <button
             type="button"
             :class="{ active: view === 'instructions' }"
             @click="view = 'instructions'"
           >
-            Instructions
+            {{ t("nav.instructions") }}
           </button>
           <button
             type="button"
             :class="{ active: view === 'memory' }"
             @click="view = 'memory'"
           >
-            Memory
+            {{ t("nav.memory") }}
           </button>
           <button
             type="button"
             :class="{ active: view === 'sessions' }"
             @click="view = 'sessions'"
           >
-            Sessions
+            {{ t("nav.sessions") }}
           </button>
           <button
             type="button"
             :class="{ active: view === 'experiments' }"
             @click="view = 'experiments'"
           >
-            Experiments
+            {{ t("nav.experiments") }}
           </button>
         </nav>
-        <button type="button" class="theme-btn" :title="'切换到' + themeLabel + '主题'" @click="toggle()">
-          {{ theme === "dark" ? "🌙" : "☀" }} {{ themeLabel }}
+        <button type="button" class="theme-btn" :title="t('app.lang')" @click="toggleLocale()">
+          {{ langLabel }}
+        </button>
+        <button type="button" class="theme-btn" :title="themeTitle" @click="toggle()">
+          {{ themeIcon }} {{ themeLabel }}
         </button>
         <button
           type="button"
           class="theme-btn"
-          title="导出到 workspace/exports/*.md"
+          :title="t('app.export.title')"
           :disabled="exportBusy"
           @click="exportMarkdown(false)"
         >
-          Export
+          {{ t("app.export.btn") }}
         </button>
         <button
           type="button"
           class="theme-btn"
-          title="浏览器下载 Markdown"
+          :title="t('app.export.mdTitle')"
           @click="exportMarkdown(true)"
         >
           ↓MD
         </button>
         <span class="pill" :data-state="stateLabel">{{ stateLabel }}</span>
-        <button type="button" :disabled="!running" @click="cancel()">Cancel</button>
+        <button type="button" :disabled="!running" @click="cancel()">{{ t("app.cancel") }}</button>
       </div>
     </header>
 

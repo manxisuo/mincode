@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { ChatMessage } from "../types";
+import { useI18n } from "../i18n";
 import MdText from "./MdText.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   messages: ChatMessage[];
@@ -28,8 +31,8 @@ function clock(iso?: string): string {
 <template>
   <section class="panel chat">
     <div class="panel-head">
-      <h2>Conversation</h2>
-      <span class="hint">Local Web · Markdown</span>
+      <h2>{{ t("chat.title") }}</h2>
+      <span class="hint">{{ t("chat.hint") }}</span>
     </div>
     <div class="messages" aria-live="polite">
       <div v-for="m in messages" :key="m.id" class="msg" :class="m.role">
@@ -43,12 +46,12 @@ function clock(iso?: string): string {
     <form class="composer" @submit.prevent="onSubmit">
       <textarea
         rows="3"
-        placeholder="输入消息（支持 Markdown），例如：**分析**这个项目的入口。"
+        :placeholder="t('chat.placeholder')"
         :value="input"
         :disabled="disabled"
         @input="emit('update:input', ($event.target as HTMLTextAreaElement).value)"
       />
-      <button class="primary" type="submit" :disabled="disabled">Send</button>
+      <button class="primary" type="submit" :disabled="disabled">{{ t("chat.send") }}</button>
     </form>
   </section>
 </template>

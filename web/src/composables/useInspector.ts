@@ -1,6 +1,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { apiCancel, apiChat, apiMetrics, apiSession } from "../api";
 import { apiSessionLoad } from "../sessionApi";
+import { t } from "../i18n";
 import type { ChatMessage, ContextSnapshot, MetricsInfo, RuntimeEvent, SessionInfo } from "../types";
 
 function msgId(): string {
@@ -293,7 +294,7 @@ export function useInspector() {
       const tools = evt.data?.tools;
       const size = evt.data?.size;
       if (Array.isArray(tools)) {
-        addSystemOnce(`parallel batch (${size}): ${tools.join(", ")}`);
+        addSystemOnce(`${t("chat.batch")} (${size}): ${tools.join(", ")}`);
       }
     }
   }
@@ -353,7 +354,7 @@ export function useInspector() {
     es = new EventSource("/api/events");
     es.addEventListener("hello", () => {
       connected.value = true;
-      addSystemOnce("SSE connected");
+      addSystemOnce(t("chat.sse"));
     });
     es.addEventListener("runtime", (ev) => {
       try {
@@ -406,7 +407,7 @@ export function useInspector() {
     try {
       const r = await apiCancel();
       lastErrorShown.value = "";
-      addSystemOnce(r.cancelled ? "cancel requested" : "nothing to cancel");
+      addSystemOnce(r.cancelled ? t("chat.cancelReq") : t("chat.nothingCancel"));
     } catch (err) {
       addSystemOnce(String((err as Error).message || err));
     }
@@ -428,7 +429,7 @@ export function useInspector() {
         : "system";
       addMessage(role, m.content);
     }
-    addSystemOnce(`restored session ${data.id} · ${data.entries ?? data.messages.length} entries`);
+    addSystemOnce(`${t("chat.restored")} ${data.id} · ${data.entries ?? data.messages.length} entries`);
     session.value = {
       ...(session.value || {
         session_id: "",
@@ -448,7 +449,7 @@ export function useInspector() {
 
   function boot() {
     connectSSE();
-    void refreshSession().catch(() => addMessage("system", "无法连接 API — 请先运行 mincode web"));
+    void refreshSession().catch(() => addMessage("system", t("chat.connectFail")));
     void refreshMetrics();
     refreshTimer = window.setInterval(() => {
       void refreshSessionThrottled();

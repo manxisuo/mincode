@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "../i18n";
 import {
   apiInstructionsAll,
   apiInstructionsReload,
   type InstructionItem,
 } from "../instructionApi";
 import MdText from "./MdText.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   /** Timeline deep-link: open this instruction rel_path/path when set. */
@@ -83,24 +86,24 @@ onBeforeUnmount(() => {
 <template>
   <section class="panel instr-panel">
     <div class="panel-head">
-      <h2>Instructions</h2>
+      <h2>{{ t("instr.title") }}</h2>
       <div class="head-actions">
         <span class="hint">{{ fileName }} · {{ items.length }} file(s)</span>
         <button type="button" class="linkish" :disabled="busy" @click="reload()">
-          Reload
+          {{ t("instr.reload") }}
         </button>
       </div>
     </div>
 
     <div v-if="error" class="exp-error">{{ error }}</div>
     <div class="instr-meta">
-      composed: {{ composedChars }} chars injected as system context
+      {{ t("instr.composed") }}: {{ composedChars }} chars
     </div>
 
     <div class="instr-body">
       <div class="instr-list">
         <div v-if="!items.length && !error" class="empty">
-          未加载指令 — 在 workspace 下添加 <code>{{ fileName }}</code>
+          {{ t("instr.empty") }} <code>{{ fileName }}</code>
         </div>
         <div
           v-for="f in items"
@@ -123,7 +126,7 @@ onBeforeUnmount(() => {
 
       <div class="instr-detail">
         <div v-if="!selected" class="empty">
-          左侧选择 AGENTS.md 查看全文（等价 CLI <code>/instructions</code>）
+          {{ t("instr.detailEmpty") }} <code>/instructions</code>
         </div>
         <template v-else>
           <div class="skills-detail-head">
@@ -132,7 +135,7 @@ onBeforeUnmount(() => {
               <div class="hint">{{ selected.path }}</div>
             </div>
             <button type="button" class="linkish" @click="selected = null">
-              关闭
+              {{ t("instr.close") }}
             </button>
           </div>
           <div class="skills-md">

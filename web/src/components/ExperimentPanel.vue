@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "../i18n";
 import { apiExperiment, apiExperiments } from "../expApi";
 import type { ExperimentAggregate, ExperimentDetail } from "../expTypes";
+
+const { t } = useI18n();
 
 const list = ref<ExperimentAggregate[]>([]);
 const selected = ref<ExperimentDetail | null>(null);
@@ -67,11 +70,11 @@ onMounted(loadList);
 <template>
   <section class="panel exp-panel">
     <div class="panel-head">
-      <h2>Experiment Dashboard</h2>
+      <h2>{{ t("exp.title") }}</h2>
       <div class="head-actions">
         <span class="hint">{{ root || "workspace experiments" }}</span>
         <button type="button" class="linkish" :disabled="loading" @click="loadList">
-          Refresh
+          {{ t("exp.refresh") }}
         </button>
       </div>
     </div>

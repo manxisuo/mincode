@@ -13,6 +13,9 @@ import PlanPanel from "./components/PlanPanel.vue";
 import PermissionBar from "./components/PermissionBar.vue";
 import SessionsPanel from "./components/SessionsPanel.vue";
 import SkillsPanel from "./components/SkillsPanel.vue";
+import ToolCallModal, {
+  type ToolCallDetail,
+} from "./components/ToolCallModal.vue";
 import { useInspector } from "./composables/useInspector";
 import { useTheme } from "./theme";
 import type { RuntimeEvent } from "./types";
@@ -62,6 +65,8 @@ const permFocus = ref<Record<string, unknown> | null>(null);
 const permEvents = ref<RuntimeEvent[]>([]);
 const fileOpen = ref(false);
 const fileDetail = ref<FileChangeDetail | null>(null);
+const toolOpen = ref(false);
+const toolDetail = ref<ToolCallDetail | null>(null);
 
 function onTimelineDeepLink(
   type: string,
@@ -101,6 +106,24 @@ function onTimelineDeepLink(
       diff: String(d.diff || ""),
     };
     fileOpen.value = true;
+    return;
+  }
+  if (type.startsWith("tool.")) {
+    toolDetail.value = {
+      type,
+      tool: String(d.tool || ""),
+      callId: String(d.call_id || d.callId || ""),
+      arguments: String(d.arguments || ""),
+      durationMs: Number(d.duration_ms || 0),
+      resultSize: Number(d.result_size || 0),
+      isError: !!d.is_error || type === "tool.failed",
+      error: String(d.error || ""),
+      outputPreview: String(d.output_preview || ""),
+      parallel: !!d.parallel,
+      index: Number(d.index || 0),
+      time: d.time != null ? String(d.time) : undefined,
+    };
+    toolOpen.value = true;
   }
 }
 const toast = ref<{ text: string; kind: "ok" | "err" | "info" } | null>(null);
@@ -177,6 +200,12 @@ async function onSwitchSession(id: string) {
       :open="fileOpen"
       :detail="fileDetail"
       @close="fileOpen = false"
+    />
+    <ToolCallModal
+      :open="toolOpen"
+      :detail="toolDetail"
+      :time-fmt="fmtTime"
+      @close="toolOpen = false"
     />
     <div
       v-if="toast"

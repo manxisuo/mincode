@@ -28,7 +28,11 @@ function isDeeplink(e: RuntimeEvent): boolean {
     t.startsWith("plan.") ||
     t.startsWith("permission.") ||
     t === "instruction.loaded" ||
-    t === "file.changed"
+    t === "file.changed" ||
+    t === "tool.started" ||
+    t === "tool.finished" ||
+    t === "tool.failed" ||
+    t === "tool.requested"
   );
 }
 
@@ -37,6 +41,7 @@ function deeplinkTitle(e: RuntimeEvent): string | undefined {
   if (e.type.startsWith("permission.")) return "点击查看权限历史";
   if (e.type === "instruction.loaded") return "跳转到 Instructions";
   if (e.type === "file.changed") return "查看 Diff / 路径";
+  if (e.type.startsWith("tool.")) return "查看工具调用详情（args / result）";
   return "点击查看 Skill / Plan 详情";
 }
 
@@ -233,6 +238,8 @@ type BatchToolRow = {
   bytes: number;
   error: string;
   status: string;
+  /** Best raw event for detail deep-link (prefer tool.finished). */
+  event?: RuntimeEvent;
 };
 
 type TimelineRow =
@@ -281,6 +288,7 @@ function mergeBatchTools(tools: RuntimeEvent[]): BatchToolRow[] {
         bytes: 0,
         error: "",
         status: e.type,
+        event: e,
       };
       map.set(key, row);
       order.push(key);
@@ -289,6 +297,11 @@ function mergeBatchTools(tools: RuntimeEvent[]): BatchToolRow[] {
     if (typeof d.arguments === "string") {
       const c = compactArg(d.arguments);
       if (c) row.args = c;
+    }
+    if (e.type === "tool.finished" || e.type === "tool.failed") {
+      row.event = e;
+    } else if (!row.event || row.event.type === "tool.started") {
+      row.event = e;
     }
     if (e.type === "tool.finished") {
       row.status = "finished";
@@ -646,10 +659,16 @@ function rawJson(e: RuntimeEvent) {
             </div>
             <div class="tl-batch-body">
               <div
-                v-for="(tr, ti) in row.rows.length ? row.rows : row.tools.map((name) => ({ tool: name, args: '', ok: true, ms: 0, bytes: 0, error: '', status: 'named' }))"
+                v-for="(tr, ti) in row.rows.length ? row.rows : row.tools.map((name) => ({ tool: name, args: '', ok: true, ms: 0, bytes: 0, error: '', status: 'named' as const, event: undefined as RuntimeEvent | undefined }))"
                 :key="ti"
                 class="tl-branch"
-                :class="{ fail: tr.ok === false, last: ti === (row.rows.length ? row.rows.length : row.tools.length) - 1 }"
+                :class="{
+                  fail: tr.ok === false,
+                  deeplink: !!tr.event && isDeeplink(tr.event),
+                  last: ti === (row.rows.length ? row.rows.length : row.tools.length) - 1,
+                }"
+                :title="tr.event ? deeplinkTitle(tr.event) : undefined"
+                @click="tr.event && onTimelineClick(tr.event)"
               >
                 <span class="branch-arm" aria-hidden="true"></span>
                 <span class="branch-tool">{{ tr.tool }}</span>
@@ -661,6 +680,7 @@ function rawJson(e: RuntimeEvent) {
                   </template>
                   <template v-else>…</template>
                 </span>
+                <span v-if="tr.event && isDeeplink(tr.event)" class="tl-goto">↗</span>
               </div>
             </div>
           </div>

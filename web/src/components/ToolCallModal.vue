@@ -1,0 +1,123 @@
+<script setup lang="ts">
+import { computed } from "vue";
+
+export interface ToolCallDetail {
+  type: string;
+  tool: string;
+  callId: string;
+  arguments: string;
+  durationMs: number;
+  resultSize: number;
+  isError: boolean;
+  error: string;
+  outputPreview: string;
+  parallel: boolean;
+  index: number;
+  time?: string;
+}
+
+const props = defineProps<{
+  open: boolean;
+  detail: ToolCallDetail | null;
+  timeFmt: (iso?: string) => string;
+}>();
+
+const emit = defineEmits<{ close: [] }>();
+
+type ArgRow = { key: string; value: string };
+
+const argRows = computed<ArgRow[]>(() => {
+  const raw = props.detail?.arguments || "";
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.entries(parsed as Record<string, unknown>).map(([key, val]) => ({
+        key,
+        value: formatVal(val),
+      }));
+    }
+    return [{ key: "(json)", value: formatVal(parsed) }];
+  } catch {
+    return [{ key: "(raw)", value: raw }];
+  }
+});
+
+const statusLabel = computed(() => {
+  const d = props.detail;
+  if (!d) return "";
+  if (d.type === "tool.failed" || d.isError) return "failed";
+  if (d.type === "tool.finished") return "finished";
+  return d.type.replace(/^tool\./, "");
+});
+
+function formatVal(v: unknown): string {
+  if (v == null) return "null";
+  if (typeof v === "string") return v;
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return String(v);
+  }
+}
+
+const outputLines = computed(() => {
+  const s = props.detail?.outputPreview || props.detail?.error || "";
+  return s;
+});
+</script>
+
+<template>
+  <div
+    v-if="open && detail"
+    class="dl-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="工具调用详情"
+    @click.self="emit('close')"
+  >
+    <div class="dl-modal">
+      <div class="dl-head">
+        <div>
+          <b>{{ detail.tool || "tool" }}</b>
+          <span class="hint">
+            {{ detail.type }}
+            <template v-if="detail.time"> · {{ timeFmt(detail.time) }}</template>
+          </span>
+        </div>
+        <button type="button" class="linkish" @click="emit('close')">关闭</button>
+      </div>
+
+      <div class="tool-meta">
+        <span class="pill" :data-state="statusLabel">{{ statusLabel }}</span>
+        <span v-if="detail.durationMs" class="meta">{{ detail.durationMs }}ms</span>
+        <span v-if="detail.resultSize" class="meta">{{ detail.resultSize }}B</span>
+        <span v-if="detail.parallel" class="meta">parallel</span>
+        <span v-if="detail.index != null && detail.index > 0" class="meta">#{{ detail.index }}</span>
+        <span v-if="detail.callId" class="meta mono" :title="detail.callId">{{ detail.callId }}</span>
+      </div>
+
+      <div class="dl-subhead">Arguments</div>
+      <div v-if="!argRows.length" class="empty">无参数</div>
+      <table v-else class="tool-args">
+        <tbody>
+          <tr v-for="r in argRows" :key="r.key">
+            <td class="k">{{ r.key }}</td>
+            <td class="v"><pre>{{ r.value }}</pre></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="dl-subhead">
+        {{ detail.isError || detail.type === "tool.failed" ? "Error" : "Result preview" }}
+      </div>
+      <pre
+        class="tool-out"
+        :class="{ err: detail.isError || detail.type === 'tool.failed' }"
+      >{{ outputLines || "—" }}</pre>
+      <div v-if="detail.resultSize && detail.outputPreview && detail.outputPreview.length < detail.resultSize" class="hint tool-trunc">
+        事件里仅含预览（{{ detail.outputPreview.length }} / {{ detail.resultSize }} 字符）；完整结果见 Context snapshot 或 History JSON
+      </div>
+    </div>
+  </div>
+</template>

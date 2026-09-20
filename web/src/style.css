@@ -636,6 +636,70 @@ button.linkish:hover:not(:disabled) {
   font-size: 12px;
 }
 
+/* Tool call detail modal */
+.tool-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.tool-meta .meta { color: var(--muted); }
+.tool-meta .mono { word-break: break-all; }
+.tool-args {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.tool-args td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  vertical-align: top;
+}
+.tool-args .k {
+  color: var(--accent);
+  white-space: nowrap;
+  width: 1%;
+  background: var(--panel-2);
+}
+.tool-args .v { color: var(--ink); word-break: break-word; }
+.tool-args .v pre {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+}
+.tool-out {
+  margin: 0;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+  max-height: 280px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.tool-out.err {
+  border-color: var(--err);
+  color: var(--err);
+}
+.tool-trunc {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.tl-branch.deeplink { cursor: pointer; }
+.tl-branch.deeplink:hover { background: var(--panel-2); }
+
 /* Parallel tool batch fork visualization */
 .tl-batch {
   margin: 8px 0 10px 8px;

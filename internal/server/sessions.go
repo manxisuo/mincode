@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,7 @@ func (s *Server) SetSessions(st *session.Store) {
 type sessionListItem struct {
 	ID           string `json:"id"`
 	Title        string `json:"title,omitempty"`
+	Note         string `json:"note,omitempty"`
 	Workspace    string `json:"workspace"`
 	Provider     string `json:"provider"`
 	Model        string `json:"model"`
@@ -69,6 +71,7 @@ func (s *Server) handleSessionList(w http.ResponseWriter, _ *http.Request) {
 		list = append(list, sessionListItem{
 			ID:           r.ID,
 			Title:        r.Title,
+			Note:         r.Note,
 			Workspace:    r.Workspace,
 			Provider:     r.Provider,
 			Model:        r.Model,
@@ -184,9 +187,10 @@ func (s *Server) saveCurrentSession() {
 		SystemPrompt: s.agent.Ctx.System(),
 		Entries:      make([]session.Entry, 0, len(entries)),
 	}
-	// Preserve auto-generated title across saves.
+	// Preserve auto-generated title/note across saves.
 	if prev, err := s.sessions.Load(id); err == nil && prev != nil {
 		rec.Title = prev.Title
+		rec.Note = prev.Note
 		rec.CreatedAt = prev.CreatedAt
 	}
 	for _, e := range entries {
@@ -217,6 +221,78 @@ func sameWorkspace(a, b string) bool {
 	a = strings.TrimRight(strings.ReplaceAll(a, "/", `\`), `\`)
 	b = strings.TrimRight(strings.ReplaceAll(b, "/", `\`), `\`)
 	return strings.EqualFold(a, b)
+}
+
+func validSessionID(id string) bool {
+	if id == "" || strings.Contains(id, "..") || strings.ContainsAny(id, `/\`) {
+		return false
+	}
+	return true
+}
+
+type sessionUpdateRequest struct {
+	// Title/note are optional. Send a field to update it; omit to leave unchanged.
+	Title *string `json:"title"`
+	Note  *string `json:"note"`
+}
+
+// handleSessionUpdate renames a session and/or updates its note.
+func (s *Server) handleSessionUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.sessions == nil {
+		writeErr(w, http.StatusNotFound, "sessions unavailable")
+		return
+	}
+	id := r.PathValue("id")
+	if !validSessionID(id) {
+		writeErr(w, http.StatusBadRequest, "invalid session id")
+		return
+	}
+	var req sessionUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if req.Title == nil && req.Note == nil {
+		writeErr(w, http.StatusBadRequest, "title or note required")
+		return
+	}
+	if err := s.sessions.SetMeta(id, req.Title, req.Note); err != nil {
+		writeErr(w, http.StatusNotFound, err.Error())
+		return
+	}
+	rec, _ := s.sessions.Load(id)
+	title, note := "", ""
+	if rec != nil {
+		title, note = rec.Title, rec.Note
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":    true,
+		"id":    id,
+		"title": title,
+		"note":  note,
+	})
+}
+
+// handleSessionDelete removes a stored session (not the active one).
+func (s *Server) handleSessionDelete(w http.ResponseWriter, r *http.Request) {
+	if s.sessions == nil {
+		writeErr(w, http.StatusNotFound, "sessions unavailable")
+		return
+	}
+	id := r.PathValue("id")
+	if !validSessionID(id) {
+		writeErr(w, http.StatusBadRequest, "invalid session id")
+		return
+	}
+	if id == s.activeSessionID() {
+		writeErr(w, http.StatusConflict, "cannot delete the active session — switch first")
+		return
+	}
+	if err := s.sessions.Delete(id); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "id": id})
 }
 
 const timeFormat = "2006-01-02T15:04:05Z"

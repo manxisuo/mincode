@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { apiSessions } from "../sessionApi";
+import { apiSessionDelete, apiSessions, apiSessionUpdate } from "../sessionApi";
 import type { SessionListItem } from "../types";
 
 const props = defineProps<{
@@ -12,6 +12,11 @@ const current = ref("");
 const sessionsDir = ref("");
 const error = ref("");
 const busy = ref("");
+
+const editingId = ref("");
+const editTitle = ref("");
+const editNote = ref("");
+const editBusy = ref(false);
 
 async function refresh() {
   error.value = "";
@@ -32,6 +37,50 @@ async function load(id: string) {
   try {
     await props.loadSession(id);
     current.value = id;
+    await refresh();
+  } catch (e) {
+    error.value = String((e as Error).message || e);
+  } finally {
+    busy.value = "";
+  }
+}
+
+function startEdit(s: SessionListItem) {
+  editingId.value = s.id;
+  editTitle.value = s.title || "";
+  editNote.value = s.note || "";
+}
+
+function cancelEdit() {
+  editingId.value = "";
+  editTitle.value = "";
+  editNote.value = "";
+}
+
+async function saveEdit(id: string) {
+  editBusy.value = true;
+  error.value = "";
+  try {
+    await apiSessionUpdate(id, {
+      title: editTitle.value.trim(),
+      note: editNote.value.trim(),
+    });
+    cancelEdit();
+    await refresh();
+  } catch (e) {
+    error.value = String((e as Error).message || e);
+  } finally {
+    editBusy.value = false;
+  }
+}
+
+async function remove(id: string) {
+  if (!window.confirm(`删除会话 ${id}？此操作不可恢复。`)) return;
+  busy.value = id;
+  error.value = "";
+  try {
+    await apiSessionDelete(id);
+    if (editingId.value === id) cancelEdit();
     await refresh();
   } catch (e) {
     error.value = String((e as Error).message || e);
@@ -82,26 +131,77 @@ onBeforeUnmount(() => {
         class="skill-card"
         :class="{ active: s.is_current || s.id === current }"
       >
-        <div class="skill-name">
-          {{ s.title || s.id }}
-          <span v-if="s.is_current || s.id === current" class="tag-on">current</span>
-        </div>
-        <div class="skill-path">
-          <template v-if="s.title">{{ s.id }} · </template>{{ fmtTime(s.updated_at) }}
-          · turns={{ s.turns ?? 0 }}
-          · msgs={{ s.message_count ?? 0 }}
-          <template v-if="s.model"> · {{ s.provider }}/{{ s.model }}</template>
-        </div>
-        <div class="skill-actions">
-          <button
-            type="button"
-            class="linkish"
-            :disabled="busy === s.id || s.id === current"
-            @click="load(s.id)"
-          >
-            {{ busy === s.id ? "加载中…" : "切换到此会话" }}
-          </button>
-        </div>
+        <template v-if="editingId === s.id">
+          <div class="sess-edit">
+            <label class="sess-edit-label">
+              标题
+              <input
+                v-model="editTitle"
+                class="tl-input"
+                placeholder="会话标题（可空）"
+                maxlength="80"
+              />
+            </label>
+            <label class="sess-edit-label">
+              备注
+              <textarea
+                v-model="editNote"
+                class="tl-input sess-note-input"
+                rows="3"
+                placeholder="备注 / 备忘（可空）"
+                maxlength="500"
+              />
+            </label>
+            <div class="skill-actions">
+              <button
+                type="button"
+                class="primary"
+                :disabled="editBusy"
+                @click="saveEdit(s.id)"
+              >
+                {{ editBusy ? "保存中…" : "保存" }}
+              </button>
+              <button type="button" class="linkish" :disabled="editBusy" @click="cancelEdit()">
+                取消
+              </button>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <div class="skill-name">
+            {{ s.title || s.id }}
+            <span v-if="s.is_current || s.id === current" class="tag-on">current</span>
+          </div>
+          <div class="skill-path">
+            <template v-if="s.title">{{ s.id }} · </template>{{ fmtTime(s.updated_at) }}
+            · turns={{ s.turns ?? 0 }}
+            · msgs={{ s.message_count ?? 0 }}
+            <template v-if="s.model"> · {{ s.provider }}/{{ s.model }}</template>
+          </div>
+          <div v-if="s.note" class="sess-note">{{ s.note }}</div>
+          <div class="skill-actions">
+            <button
+              type="button"
+              class="linkish"
+              :disabled="busy === s.id || s.id === current"
+              @click="load(s.id)"
+            >
+              {{ busy === s.id ? "加载中…" : "切换到此会话" }}
+            </button>
+            <button type="button" class="linkish" @click="startEdit(s)">
+              重命名 / 备注
+            </button>
+            <button
+              type="button"
+              class="linkish danger"
+              :disabled="busy === s.id || s.id === current"
+              :title="s.id === current ? '不能删除当前会话' : '删除会话'"
+              @click="remove(s.id)"
+            >
+              删除
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   </section>

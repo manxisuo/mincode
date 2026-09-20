@@ -27,6 +27,7 @@ type Entry struct {
 type Record struct {
 	ID           string    `json:"id"`
 	Title        string    `json:"title,omitempty"`
+	Note         string    `json:"note,omitempty"`
 	Workspace    string    `json:"workspace"`
 	Provider     string    `json:"provider"`
 	Model        string    `json:"model"`
@@ -92,6 +93,34 @@ func (s *Store) SetTitle(id, title string) error {
 	}
 	rec.Title = title
 	return s.Save(rec)
+}
+
+// SetMeta updates title and/or note. Empty title/note clear the field when
+// the corresponding pointer is non-nil.
+func (s *Store) SetMeta(id string, title, note *string) error {
+	rec, err := s.Load(id)
+	if err != nil {
+		return err
+	}
+	if title != nil {
+		rec.Title = strings.TrimSpace(*title)
+	}
+	if note != nil {
+		rec.Note = strings.TrimSpace(*note)
+	}
+	return s.Save(rec)
+}
+
+// Delete removes a session file. Missing files are not an error.
+func (s *Store) Delete(id string) error {
+	if id == "" {
+		return fmt.Errorf("session id required")
+	}
+	err := os.Remove(s.path(id))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // Latest returns the most recently updated session for a workspace.

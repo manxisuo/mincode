@@ -16,3 +16,26 @@ export function apiSessionLoad(id: string) {
     { method: "POST" },
   );
 }
+
+export function apiSessionUpdate(
+  id: string,
+  body: { title?: string; note?: string },
+) {
+  return fetchJSON<{
+    ok: boolean;
+    id: string;
+    title?: string;
+    note?: string;
+  }>("/api/sessions/" + encodeURIComponent(id), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function apiSessionDelete(id: string) {
+  return fetchJSON<{ ok: boolean; id: string }>(
+    "/api/sessions/" + encodeURIComponent(id),
+    { method: "DELETE" },
+  );
+}

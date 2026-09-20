@@ -755,12 +755,19 @@ button.linkish:hover:not(:disabled) {
   font-weight: 600;
 }
 .tl-branch .branch-stat {
-  max-width: 220px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tl-branch .branch-stat .tl-goto {
+  margin-left: 0;
+  flex-shrink: 0;
 }
 /* Long errors: allow two-line wrap inside the row instead of overflowing */
 .tl-branch.fail {
@@ -777,6 +784,11 @@ button.linkish:hover:not(:disabled) {
   word-break: break-all;
   justify-self: start;
   margin-top: 2px;
+  display: block;
+}
+.tl-branch.fail .branch-stat .tl-goto {
+  display: inline;
+  margin-left: 6px;
 }
 .tl-branch .branch-arm {
   position: relative;

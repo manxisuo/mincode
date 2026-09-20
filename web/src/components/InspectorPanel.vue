@@ -682,8 +682,8 @@ function rawJson(e: RuntimeEvent) {
                     ✓ {{ tr.ms }}ms · {{ tr.bytes }}B
                   </template>
                   <template v-else>…</template>
+                  <span v-if="tr.event && isDeeplink(tr.event)" class="tl-goto">↗</span>
                 </span>
-                <span v-if="tr.event && isDeeplink(tr.event)" class="tl-goto">↗</span>
               </div>
             </div>
           </div>

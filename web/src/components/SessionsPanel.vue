@@ -83,11 +83,12 @@ onBeforeUnmount(() => {
         :class="{ active: s.is_current || s.id === current }"
       >
         <div class="skill-name">
-          {{ s.id }}
+          {{ s.title || s.id }}
           <span v-if="s.is_current || s.id === current" class="tag-on">current</span>
         </div>
         <div class="skill-path">
-          {{ fmtTime(s.updated_at) }} · turns={{ s.turns ?? 0 }}
+          <template v-if="s.title">{{ s.id }} · </template>{{ fmtTime(s.updated_at) }}
+          · turns={{ s.turns ?? 0 }}
           · msgs={{ s.message_count ?? 0 }}
           <template v-if="s.model"> · {{ s.provider }}/{{ s.model }}</template>
         </div>

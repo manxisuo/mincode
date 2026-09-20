@@ -16,6 +16,7 @@ func (s *Server) SetSessions(st *session.Store) {
 
 type sessionListItem struct {
 	ID           string `json:"id"`
+	Title        string `json:"title,omitempty"`
 	Workspace    string `json:"workspace"`
 	Provider     string `json:"provider"`
 	Model        string `json:"model"`
@@ -67,6 +68,7 @@ func (s *Server) handleSessionList(w http.ResponseWriter, _ *http.Request) {
 		}
 		list = append(list, sessionListItem{
 			ID:           r.ID,
+			Title:        r.Title,
 			Workspace:    r.Workspace,
 			Provider:     r.Provider,
 			Model:        r.Model,
@@ -181,6 +183,11 @@ func (s *Server) saveCurrentSession() {
 		Model:        s.opts.Model,
 		SystemPrompt: s.agent.Ctx.System(),
 		Entries:      make([]session.Entry, 0, len(entries)),
+	}
+	// Preserve auto-generated title across saves.
+	if prev, err := s.sessions.Load(id); err == nil && prev != nil {
+		rec.Title = prev.Title
+		rec.CreatedAt = prev.CreatedAt
 	}
 	for _, e := range entries {
 		rec.Entries = append(rec.Entries, session.Entry{

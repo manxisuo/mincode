@@ -26,6 +26,7 @@ type Entry struct {
 // Record is the on-disk session document.
 type Record struct {
 	ID           string    `json:"id"`
+	Title        string    `json:"title,omitempty"`
 	Workspace    string    `json:"workspace"`
 	Provider     string    `json:"provider"`
 	Model        string    `json:"model"`
@@ -81,6 +82,16 @@ func (s *Store) Load(id string) (*Record, error) {
 		return nil, fmt.Errorf("parse session %s: %w", id, err)
 	}
 	return &rec, nil
+}
+
+// SetTitle updates the display title of a saved session.
+func (s *Store) SetTitle(id, title string) error {
+	rec, err := s.Load(id)
+	if err != nil {
+		return err
+	}
+	rec.Title = title
+	return s.Save(rec)
 }
 
 // Latest returns the most recently updated session for a workspace.

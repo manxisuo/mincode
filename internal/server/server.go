@@ -278,6 +278,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			s.lastErr = err.Error()
 		}
 		s.mu.Unlock()
+		// Name the session after the first turn; async so the agent is not blocked.
+		if msg != "" {
+			go s.autoNameSession(msg)
+		}
 	}()
 
 	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "running": true})

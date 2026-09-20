@@ -118,6 +118,7 @@ export interface PendingPermission {
 
 export interface SessionListItem {
   id: string;
+  title?: string;
   workspace?: string;
   provider?: string;
   model?: string;

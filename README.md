@@ -6,7 +6,7 @@ Min Code Agent 是一个面向学习、实验和研究的轻量级 Code Agent Ru
 
 它的目标不是复制 Claude Code、Codex CLI、Cursor Agent 或 OpenCode，也不是追求功能数量，而是通过一个结构清晰、行为透明、可观测、可扩展的实现，理解现代 Code Agent 的核心工作机制。
 
-**当前状态：Roadmap Phase 0–12 已完成**，并包含 Hardening 修复、MVP 验收测试、Parallel Tool Calls，以及 **W1 Local Web Inspector**。
+**当前状态：Roadmap Phase 0–12 已完成**，并包含 Hardening、MVP 验收测试、Parallel Tool Calls、LLM 流式输出，以及功能完整的 **Local Web Inspector**（会话 / 计划 / 深链 / 中英文界面等）。
 
 ## 核心目标
 
@@ -59,18 +59,19 @@ Language        Go
 CLI             标准 flag
 Config          YAML
 Storage         JSON / JSONL
-Session         JSON
+Session         JSON（含 title / note 元数据）
 Trace           JSONL
 Testing         Go testing
-LLM             OpenAI-compatible API
+LLM             OpenAI-compatible API + Fake Provider（可流式）
+Web UI          Vue 3 + TypeScript + Vite（embed 进二进制）
 ```
 
-## 已实现能力（Phase 0–12）
+## 已实现能力（Phase 0–12 + Web Inspector）
 
 ```text
 CLI REPL / 单次执行 / --continue / replay
 
-OpenAI-compatible + Fake Provider
+OpenAI-compatible + Fake Provider（含 ChatStream 流式）
 
 Agent Loop（状态机、loop detection、取消）
 
@@ -81,22 +82,67 @@ Tools:
 
 Parallel Tool Calls（连续只读工具并行；写/Shell 保持串行）
 
-Workspace 沙箱 + Permission（文件路径逃逸、危险 shell 拒绝）
+Workspace 沙箱 + Permission（路径逃逸、危险 shell 拒绝）
+  · Web 模式下 Ask 级操作可在页面审批
 
 Context:
   token budget / snapshot / compression
   Instructions (AGENTS.md 层级) / Skills / Memory
 
 Session 持久化、Trace JSONL、Timeline、Metrics
+  · 会话自动 LLM 命名（失败回退首条用户消息截断）
+  · 会话重命名 / 备注 / 删除（当前会话不可删）
 
-Plan Mode（/plan 草稿 → approve → 逐步执行）
+Plan Mode（草案 → approve → 逐步执行）
+  · Web Plan 页展示每步 final 与进行中输出
 
-Experiment Framework（run / list / show / compare，含 min/median/avg/max）
+Experiment Framework（run / list / show / compare）
 
-会话导出 Markdown（/export）
+会话导出 Markdown（CLI /export；Web 页 Export / ↓MD）
 ```
 
-与普通练习型 Code Agent 最大的区别：从第一天起就包含完整的 **Observation Layer**。
+与普通练习型 Code Agent 最大的区别：从第一天起就包含完整的 **Observation Layer**，并用 Web UI 把内部过程摊开给用户。
+
+## Local Web Inspector
+
+```bash
+mincode web                         # 默认 http://127.0.0.1:8080
+mincode web . --addr 127.0.0.1:9090
+mincode web --provider fake         # 离线演示
+```
+
+浏览器打开后可切换页签（界面支持 **中文 / English**，顶栏一键切换）：
+
+| 页签 | 内容 |
+|---|---|
+| **Inspector** | 左：对话（Markdown、流式）；右：Metrics、Context snapshot、Timeline |
+| **Plan** | 计划草案 / 批准执行；每步展示 final，running 时同步 Agent 输出 |
+| **Skills** | 技能列表、激活/停用、SKILL.md 全文 |
+| **Instructions** | AGENTS.md 层级加载结果 |
+| **Memory** | 跨会话记忆查看与添加 |
+| **Sessions** | 会话列表（自动标题）、切换、重命名/备注/删除 |
+| **Experiments** | 实验对比看板 |
+
+**Inspector 可观测细节（节选）：**
+
+- **Context snapshot**：按顺序折叠同源 Run；展开后可点条目「… 展开」查看 preview 全文（多行）
+- **Timeline**：完整事件类型名（如 `tool.finished`、`permission.requested`）；并行 tool batch 以分叉图展示，`↗` 与状态同行
+- **深链**：
+  - `permission.*` → 权限历史弹窗（蓝框定位当前点击项）
+  - `instruction.loaded` → Instructions 并选中对应文件
+  - `file.changed` → 路径 / operation / Diff
+  - `tool.*` → 结构化 args 键值表与 result 预览
+- **权限**：顶部 Permission Bar 展示待批工具与 diff，可 Allow / Deny
+- **History**：可加载历史 trace JSONL，勾选 JSON 查看原始事件
+
+前端源码在 `web/`，生产资源由 Vite 构建到 `web/dist/` 后 `embed` 进二进制。**改前端后必须**重新：
+
+```bash
+cd web && npm install && npm run build && cd ..
+go build -o mincode ./cmd/mincode
+```
+
+开发调试可用 `cd web && npm run dev`（代理 `/api` 到 8080）。
 
 ## 快速开始
 
@@ -108,7 +154,7 @@ cp mincode.example.yaml mincode.yaml
 export OPENAI_API_KEY=sk-...
 # 或 MINCODE_API_KEY / MINCODE_BASE_URL / MINCODE_MODEL
 
-# Web UI 静态资源（embed 用；仓库不提交 dist/）
+# Web UI 静态资源（embed 用；仓库可不提交 dist/，以实际仓库策略为准）
 cd web && npm install && npm run build && cd ..
 
 go build -o mincode ./cmd/mincode
@@ -142,27 +188,6 @@ mincode --continue
 mincode replay <session-id>
 ```
 
-本地 Web Inspector（W1）：
-
-```bash
-mincode web              # 默认 http://127.0.0.1:8080
-mincode web . --addr 127.0.0.1:9090
-```
-
-浏览器打开后左侧对话、右侧实时 Timeline / Context / Metrics。
-
-前端为 **Vue 3 + TypeScript**（`web/`），生产资源由 Vite 构建到 `web/dist/`，再 `embed` 进二进制：
-
-```bash
-cd web
-npm install
-npm run build    # 产出 dist/，随后 go build 使用 embed
-```
-
-改前端后需重新 `npm run build && go build`。开发调试可用 `cd web && npm run dev`（代理 `/api` 到 8080）。
-
-后续计划含 **LLM 流式输出**（边生成边展示、取消更早中断），详见 `roadmap.md`。
-
 Sessions / traces / experiments 默认写在：
 
 ```text
@@ -180,7 +205,7 @@ mincode experiment run --name model-b --task "说明 CLI 到 tool 的调用链" 
 mincode experiment compare model-a model-b
 ```
 
-结果写入 `<workspace>/.mincode/experiments/<name>/`。对比时优先看 **median**（均值易被 outlier 拉偏）。
+结果写入实验存储目录（global 布局为 `{home}/.mincode/projects/<project-id>/experiments/`，或 `data.location: workspace` 时为 `<workspace>/.mincode/experiments/`）。对比时优先看 **median**（均值易被 outlier 拉偏）。
 
 ## 典型执行流程
 
@@ -191,9 +216,9 @@ Prompt / Instructions / Skills / Memory
     ↓
 Context Construction
     ↓
-LLM Request
+LLM Request（可流式：delta → Timeline / 对话气泡）
     ↓
-Tool Selection
+Tool Selection / Permission
     ↓
 Environment Feedback
     ↓

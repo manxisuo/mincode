@@ -26,7 +26,9 @@ Min Code Agent 是一个面向学习、实验和研究的轻量级 Code Agent Ru
    架构、调用链和模块边界必须清晰，不为了“工程高级感”引入过度抽象。
 
 2. **可观测性是一等公民**  
-   Agent、LLM、Context、Tool、Permission、Session、Compression 等核心行为都应产生结构化事件。
+   Agent、LLM、Context、Tool、Permission、Session、Compression 等核心行为都应产生结构化事件。  
+   透明性优先解释 **Runtime 的显式决策**（为何排除/压缩/拒绝/并行）与 **数据血缘**（信息从哪来、经过何种变换）；对 LLM 行为只展示可观察的 **action rationale**（动作、参数、依据证据），禁止把推测的内部推理当作事实展示。  
+   透明性层级（L1–L5）与 Roadmap 见 [observability.md](observability.md) §19–21 与 [roadmap.md](roadmap.md)「Transparency Deepening」。
 
 3. **模型只是组件**  
    Agent 能力来自 LLM、Context Engineering、Tool Design、Agent Loop、环境反馈、安全边界和可观测性的组合。Provider 必须可替换。
@@ -244,8 +246,8 @@ Min Code Agent 的目标不是只让 Agent “能工作”，而是让开发者�
 ## 文档
 
 - [架构设计](architecture.md)
-- [可观测性设计](observability.md)
-- [开发路线图](roadmap.md)
+- [可观测性设计](observability.md)（含透明性层级 L1–L5 与 Roadmap）
+- [开发路线图](roadmap.md)（含 Transparency Deepening）
 - [Agent 开发约束](AGENTS.md)
 
 ## 验收

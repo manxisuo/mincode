@@ -255,14 +255,16 @@ pinned
 
 ## 8. Reasoning / Explanation 规则
 
+透明性优先解释 **Runtime 的显式决策**（context 排除/压缩、permission 判定、并行化等真实代码分支）与 **数据血缘**（信息从哪来、经过何种变换）。
+
+对 LLM 行为只展示可观察的 **action rationale**（动作、参数、依据证据）；**禁止把推测的内部推理当作事实展示**，不要设计成依赖模型输出完整隐藏思维链。
+
 项目可以记录：
 
 - Action
 - Decision Summary
 - Reason Summary
 - Observed Evidence
-
-不要设计成依赖模型输出完整隐藏思维链。
 
 推荐：
 
@@ -272,7 +274,12 @@ grep
 
 Reason:
 Locate HTTP route registration before modifying code.
+
+Evidence:
+Previous read_file showed no route registration in main.go.
 ```
+
+透明性层级与交付优先级见 `observability.md` §19–21 与 `roadmap.md`「Transparency Deepening」（Wire Request、Context Diff、Provenance 等按序小步实现）。
 
 ## 9. 错误处理
 

@@ -516,7 +516,12 @@ Result:
 
 ## 16. Reason / Decision 展示
 
-项目需要可解释性，但不应设计成依赖完整隐藏思维链。
+透明性分两类，实现与 UI 必须区分清楚：
+
+| 类型 | 展示什么 | 要求 |
+|---|---|---|
+| **Runtime 决策** | 策略分支、阈值、规则命中（budget 排除、shell Deny、为何并行） | 100% 可解释，与代码逻辑一致 |
+| **LLM 行为** | Action、Arguments、可观察证据、简短 action rationale | **禁止**把推测的内部思维链当作事实 |
 
 建议记录：
 
@@ -535,9 +540,14 @@ grep
 
 Reason:
 Locate HTTP route registration before modifying code.
+
+Evidence:
+Previous read_file showed no route registration in main.go.
 ```
 
-目标是理解行为依据，而不是保存长篇内部推理文本。
+目标是理解 **Runtime 为何这样做** 与 **数据从哪来**，而不是保存长篇内部推理文本。
+
+更完整的透明性层级与优先级（Wire Request、Context Diff、Provenance 等）见后续 Roadmap；本项目「绝对透明」以 **显式决策 + 数据血缘** 为主干。
 
 ## 17. Observability 测试
 
@@ -572,3 +582,56 @@ replay parsing
 ```
 
 如果不能回答这些问题，该能力的设计还不完整。
+
+**透明性原则**：优先解释 Runtime 的显式决策与数据血缘；对 LLM 只展示可观察的 action rationale，禁止把推测的内部推理当作事实展示。
+
+## 19. 透明性层级（Transparency Levels）
+
+为避免 Inspector 无方向膨胀，观测能力按层验收：
+
+| 层级 | 回答的问题 | 典型能力 | 现状 |
+|---|---|---|---|
+| **L1 Event** | 发生了什么？ | Timeline、状态机、metrics | 已有 |
+| **L2 Data** | 输入输出是什么？ | tool args/result 预览、context snapshot、session 内容 | 部分具备 |
+| **L3 Causal** | Runtime 为何这样决定？ | 排除/压缩/拒绝/并行的原因与策略链；estimated vs provider tokens | **下一阶段主攻** |
+| **L4 Provenance** | 这条信息从哪来、经过什么变换？ | file → tool_result → context item → LLM request 血缘 | **下一阶段主攻** |
+| **L5 Replay** | 当时完整 Runtime 状态是什么？ | 拖到 Step N 时 state+context+config+plan+memory 整体回放 | 规划中 |
+
+**实现约束（与 §8 / §16 一致）：**
+
+- L3/L4 针对 **Runtime 显式决策** 与 **数据变换**，必须与代码分支一致。
+- LLM 相关展示仅限 action rationale + evidence，**禁止**伪造思维链。
+
+## 20. 透明性 Roadmap（优先级）
+
+两条必须先打通的主链：
+
+```text
+① Context Builder → sanitize/trim → Provider Adapter → Wire HTTP Request
+② Source(File/Tool) → Context Item → LLM Request → Next Action
+```
+
+| 序 | 能力 | 层级 | 完成定义（DoD 摘要） |
+|---|---|---|---|
+| 1 | **Wire Request View** | L2→L3 | 展示 model/messages/tools 关键字段；estimated tokens vs provider `prompt_tokens` 与 delta；可追溯 Context → trim → provider 转换 → 最终请求 |
+| 2 | **Context Diff + 排除/压缩原因** | L3 | 相邻 snapshot 的 ± 条目；excluded/truncated 带 policy、reason、节省 tokens |
+| 3 | **Provenance / 数据血缘** | L4 | context item 可追到 tool.call_id、路径/行号、进入 context 的 step、transform（截断等） |
+| 4 | **Runtime Decision Trace** | L3 | permission 策略链（规则→命中→Allow/Ask/Deny）；并行原因（ParallelSafe、MaxParallel）；loop detection 等 |
+| 5 | **Historical Snapshot Replay** | L5 | Inspector 在 Step N 展示当时完整状态，而非「当前状态 + 事件列表」 |
+| 6 | **Tool 全文结果 / 失败详情** | L2 | 按 call_id 可选加载完整 output 与错误（预览默认，全文显式拉取） |
+| 7 | **Config Resolution Inspector** | L3 | model/base_url/budget 等的 Default → Global → Project → Env → CLI 覆盖链 |
+
+每项均须：结构化事件或 API 可测、Web/CLI 至少一侧可展示、不依赖未记录的「口头解释」。
+
+交付顺序按上表；实现时仍遵守 AGENTS.md「每次只做一个 Phase/子任务」。
+
+## 21. 透明性验收问题（评审用）
+
+新观测能力合入前，应能回答：
+
+```text
+用户能否指出这条 context 的来源？
+用户能否解释这次排除/拒绝是哪条规则触发的？
+用户能否看到真正发给 Provider 的请求，而不只是本地 Snapshot？
+展示的「原因」是 Runtime 分支，还是被包装成事实的推测？
+```

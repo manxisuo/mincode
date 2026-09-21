@@ -1,4 +1,6 @@
-# Min Code Agent
+<img width="2172" height="724" alt="MinCode" src="https://github.com/user-attachments/assets/cd956ac4-26fb-449d-9436-068fd06801d6" />
+
+# Min Code
 
 Min Code Agent 是一个面向学习、实验和研究的轻量级 Code Agent Runtime。
 

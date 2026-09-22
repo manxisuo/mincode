@@ -45,6 +45,12 @@ function previewData(data?: Record<string, unknown>): string {
   if (data.operation != null && data.path != null) {
     return `${data.operation} ${data.path}`;
   }
+  if (data.stage != null && data.message_count != null) {
+    return `stage=${data.stage} msgs=${data.message_count} tools=${data.tool_count ?? 0} est=${data.estimated_prompt_tokens ?? "—"}`;
+  }
+  if (data.estimated_prompt_tokens != null && data.input_tokens != null) {
+    return `est=${data.estimated_prompt_tokens} provider=${data.input_tokens} Δ=${data.prompt_token_delta ?? "?"}`;
+  }
   if (data.rel_path != null) {
     return `${data.rel_path}${data.bytes != null ? ` · ${data.bytes}B` : ""}`;
   }

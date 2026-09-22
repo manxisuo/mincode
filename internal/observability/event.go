@@ -24,6 +24,8 @@ const (
 	EventLLMRequestStarted  EventType = "llm.request_started"
 	EventLLMRequestFinished EventType = "llm.request_finished"
 	EventLLMRequestFailed   EventType = "llm.request_failed"
+	// EventLLMWireRequest is the provider-bound payload summary (after context build).
+	EventLLMWireRequest EventType = "llm.wire_request"
 
 	EventLLMStreamStarted  EventType = "llm.stream_started"
 	EventLLMStreamDelta    EventType = "llm.stream_delta"
@@ -112,6 +114,50 @@ type LLMRequestData struct {
 	TTFTMS   int64  `json:"ttft_ms,omitempty"`
 	Deltas   int    `json:"deltas,omitempty"`
 	Partial  string `json:"partial,omitempty"`
+	// Wire / token transparency (T-obs-1).
+	EstimatedPromptTokens int `json:"estimated_prompt_tokens,omitempty"`
+	PromptTokenDelta      int `json:"prompt_token_delta,omitempty"`
+	WireMessageCount      int `json:"wire_message_count,omitempty"`
+	WireToolCount         int `json:"wire_tool_count,omitempty"`
+}
+
+// WireMessageInfo summarizes one provider-bound message.
+type WireMessageInfo struct {
+	Index          int      `json:"index"`
+	Role           string   `json:"role"`
+	ContentLen     int      `json:"content_len"`
+	ContentPreview string   `json:"content_preview,omitempty"`
+	ToolCallID     string   `json:"tool_call_id,omitempty"`
+	ToolCalls      []string `json:"tool_calls,omitempty"`
+}
+
+// WireToolInfo summarizes one tool schema on the wire.
+type WireToolInfo struct {
+	Name           string `json:"name"`
+	SchemaBytes    int    `json:"schema_bytes"`
+	DescriptionLen int    `json:"description_len,omitempty"`
+}
+
+// WireRequestData is payload for llm.wire_request — what goes to the provider
+// after Context Builder (budget, sanitize). Summaries are bounded; full
+// messages are available via GET /api/wire when stored.
+type WireRequestData struct {
+	Provider              string            `json:"provider"`
+	Model                 string            `json:"model"`
+	Stream                bool              `json:"stream"`
+	Stage                 string            `json:"stage"`
+	Messages              []WireMessageInfo `json:"messages"`
+	Tools                 []WireToolInfo    `json:"tools"`
+	MessageCount          int               `json:"message_count"`
+	ToolCount             int               `json:"tool_count"`
+	ContentBytes          int               `json:"content_bytes"`
+	SchemaBytes           int               `json:"schema_bytes"`
+	Temperature           *float64          `json:"temperature,omitempty"`
+	MaxTokens             *int              `json:"max_tokens,omitempty"`
+	EstimatedPromptTokens int               `json:"estimated_prompt_tokens,omitempty"`
+	// Snapshot totals for the same build (context only vs +tool schemas).
+	SnapshotTotalTokens int `json:"snapshot_total_tokens,omitempty"`
+	SnapshotToolTokens  int `json:"snapshot_tool_tokens,omitempty"`
 }
 
 // StreamDeltaData is payload for llm.stream_delta.

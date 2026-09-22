@@ -163,6 +163,21 @@ const enUS = {
   "exp.title": "Experiment Dashboard",
   "exp.refresh": "Refresh",
   "exp.empty": "No experiment data yet",
+  "wire.title": "Wire request",
+  "wire.close": "Close",
+  "wire.chainTitle": "Assembly chain",
+  "wire.chain.context": "Context Builder (budget / instructions / skills / memory)",
+  "wire.chain.sanitize": "Sanitize tool ↔ tool_call pairing",
+  "wire.chain.provider": "Provider payload (messages + tool schemas)",
+  "wire.tokensTitle": "Tokens",
+  "wire.tokEstimated": "Estimated (local)",
+  "wire.tokSnapshot": "Snapshot total",
+  "wire.tokTools": "tool schemas",
+  "wire.tokProvider": "Provider prompt_tokens",
+  "wire.tokDelta": "Delta (provider − estimated)",
+  "wire.messagesTitle": "Messages",
+  "wire.toolsTitle": "Tools",
+  "wire.empty": "No wire request recorded yet",
 };
 
 const zhCN: Record<keyof typeof enUS, string> = {
@@ -319,6 +334,21 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "exp.title": "实验看板",
   "exp.refresh": "刷新",
   "exp.empty": "尚无实验数据",
+  "wire.title": "Wire 请求",
+  "wire.close": "关闭",
+  "wire.chainTitle": "组装链路",
+  "wire.chain.context": "Context Builder（预算 / 指令 / 技能 / 记忆）",
+  "wire.chain.sanitize": "修复 tool ↔ tool_call 配对",
+  "wire.chain.provider": "Provider 载荷（messages + tool schemas）",
+  "wire.tokensTitle": "Token 对账",
+  "wire.tokEstimated": "本地估算",
+  "wire.tokSnapshot": "Snapshot 合计",
+  "wire.tokTools": "工具 schema",
+  "wire.tokProvider": "Provider prompt_tokens",
+  "wire.tokDelta": "差值（provider − 估算）",
+  "wire.messagesTitle": "消息",
+  "wire.toolsTitle": "工具",
+  "wire.empty": "尚无 Wire 请求记录",
 };
 
 const dict = {

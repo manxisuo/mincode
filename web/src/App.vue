@@ -16,10 +16,12 @@ import SkillsPanel from "./components/SkillsPanel.vue";
 import ToolCallModal, {
   type ToolCallDetail,
 } from "./components/ToolCallModal.vue";
+import WireRequestModal from "./components/WireRequestModal.vue";
 import { useI18n } from "./i18n";
 import { useInspector } from "./composables/useInspector";
 import { useTheme } from "./theme";
 import type { RuntimeEvent } from "./types";
+import { apiWire, type WireRecord } from "./wireApi";
 
 const { theme, toggle } = useTheme();
 const { t, toggleLocale, langLabel } = useI18n();
@@ -75,6 +77,20 @@ const fileOpen = ref(false);
 const fileDetail = ref<FileChangeDetail | null>(null);
 const toolOpen = ref(false);
 const toolDetail = ref<ToolCallDetail | null>(null);
+const wireOpen = ref(false);
+const wireRecord = ref<WireRecord | null>(null);
+const wireEvent = ref<RuntimeEvent | null>(null);
+
+async function openWireView(evt?: RuntimeEvent) {
+  wireEvent.value = evt || null;
+  wireOpen.value = true;
+  try {
+    const data = await apiWire();
+    wireRecord.value = data.wire || null;
+  } catch {
+    wireRecord.value = null;
+  }
+}
 
 function onTimelineDeepLink(
   type: string,
@@ -132,6 +148,20 @@ function onTimelineDeepLink(
       time: d.time != null ? String(d.time) : undefined,
     };
     toolOpen.value = true;
+    return;
+  }
+  if (
+    type === "llm.wire_request" ||
+    type === "llm.request_finished" ||
+    type === "llm.request_started"
+  ) {
+    // Reconstruct a synthetic RuntimeEvent for token fields when needed.
+    const synthetic: RuntimeEvent = {
+      type,
+      time: d.time != null ? String(d.time) : undefined,
+      data: d,
+    };
+    void openWireView(synthetic);
   }
 }
 const toast = ref<{ text: string; kind: "ok" | "err" | "info" } | null>(null);
@@ -214,6 +244,13 @@ async function onSwitchSession(id: string) {
       :detail="toolDetail"
       :time-fmt="fmtTime"
       @close="toolOpen = false"
+    />
+    <WireRequestModal
+      :open="wireOpen"
+      :wire="wireRecord"
+      :event="wireEvent"
+      :time-fmt="fmtTime"
+      @close="wireOpen = false"
     />
     <div
       v-if="toast"

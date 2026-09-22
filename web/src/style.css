@@ -700,6 +700,49 @@ button.linkish:hover:not(:disabled) {
 .tl-branch.deeplink { cursor: pointer; }
 .tl-branch.deeplink:hover { background: var(--panel-2); }
 
+/* Wire request modal (T-obs-1) */
+.wire-modal { width: min(840px, 100%); }
+.wire-chain-list {
+  margin: 0;
+  padding-left: 18px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.wire-chain-list li { margin-bottom: 2px; }
+.wire-chain-list code { color: var(--accent); }
+.wire-tokens td.k { width: 1%; white-space: nowrap; }
+.wire-tokens td.v.warn { color: var(--warn); }
+.wire-msgs { display: flex; flex-direction: column; gap: 8px; }
+.wire-msg {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.wire-msg-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.wire-msg-head .role { color: var(--ink); font-weight: 600; }
+.wire-msg-head .idx { color: var(--accent); }
+.wire-msg-head .tid { color: var(--llm-accent); }
+.wire-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+  max-height: 160px;
+  overflow: auto;
+  font: inherit;
+}
+.wire-tools { word-break: break-all; }
+.wire-params { margin-top: 8px; }
+
 /* Parallel tool batch fork visualization */
 .tl-batch {
   margin: 8px 0 10px 8px;

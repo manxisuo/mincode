@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -63,12 +64,42 @@ type Agent struct {
 	// lastTTFT is TTFT of the most recent streamed chat call.
 	lastTTFT time.Duration
 
+	// lastWire is the most recent provider-bound request (T-obs-1 wire view).
+	lastWireMu sync.Mutex
+	lastWire   *WireRecord
+
 	// Ctx builds budgeted prompts and keeps conversation state.
 	Ctx   *ctxmgr.Manager
 	State State
 
 	// Instr loads hierarchical AGENTS.md instructions (optional).
 	Instr *instruction.Loader
+}
+
+// WireRecord is one provider-bound LLM request for the wire inspector.
+type WireRecord struct {
+	Time                  time.Time          `json:"time"`
+	Step                  int                `json:"step"`
+	Provider              string             `json:"provider"`
+	Model                 string             `json:"model"`
+	Stream                bool               `json:"stream"`
+	Messages              []llm.Message      `json:"messages"`
+	Tools                 []WireToolSummary  `json:"tools"`
+	Temperature           *float64           `json:"temperature,omitempty"`
+	MaxTokens             *int               `json:"max_tokens,omitempty"`
+	EstimatedPromptTokens int                `json:"estimated_prompt_tokens"`
+	SnapshotTotalTokens   int                `json:"snapshot_total_tokens"`
+	SnapshotToolTokens    int                `json:"snapshot_tool_tokens"`
+	ProviderPromptTokens  int                `json:"provider_prompt_tokens,omitempty"`
+	PromptTokenDelta      int                `json:"prompt_token_delta,omitempty"`
+	Summary               llm.RequestSummary `json:"summary"`
+}
+
+// WireToolSummary is tool metadata stored with a wire record.
+type WireToolSummary struct {
+	Name           string `json:"name"`
+	SchemaBytes    int    `json:"schema_bytes"`
+	DescriptionLen int    `json:"description_len,omitempty"`
 }
 
 // New creates an agent with a context manager.
@@ -474,11 +505,133 @@ func summarizeToolCall(name, args string) string {
 }
 
 func (a *Agent) emitLLMStarted(req llm.ChatRequest) {
+	a.recordWire(req)
 	a.emit(observability.EventLLMRequestStarted, observability.LLMRequestData{
 		Provider:     a.Provider.Name(),
 		Model:        a.Provider.Model(),
 		MessageCount: len(req.Messages),
 	})
+	a.emitWireRequest(req)
+}
+
+// recordWire stores the provider-bound request after Context Builder.
+func (a *Agent) recordWire(req llm.ChatRequest) {
+	est, snapTotal, snapTools := a.wireTokenEstimate()
+	sum := llm.DescribeRequest(req, a.Provider.Name(), a.Provider.Model())
+	rec := &WireRecord{
+		Time:                  time.Now().UTC(),
+		Step:                  a.stepForWire(),
+		Provider:              a.Provider.Name(),
+		Model:                 sum.Model,
+		Messages:              append([]llm.Message(nil), req.Messages...),
+		Temperature:           req.Temperature,
+		MaxTokens:             req.MaxTokens,
+		EstimatedPromptTokens: est,
+		SnapshotTotalTokens:   snapTotal,
+		SnapshotToolTokens:    snapTools,
+		Summary:               sum,
+	}
+	rec.Tools = make([]WireToolSummary, 0, len(sum.Tools))
+	for _, t := range sum.Tools {
+		rec.Tools = append(rec.Tools, WireToolSummary{
+			Name:           t.Name,
+			SchemaBytes:    t.SchemaBytes,
+			DescriptionLen: t.DescriptionLen,
+		})
+	}
+	a.lastWireMu.Lock()
+	a.lastWire = rec
+	a.lastWireMu.Unlock()
+}
+
+func (a *Agent) wireTokenEstimate() (est, total, tools int) {
+	if a.Ctx == nil {
+		return 0, 0, 0
+	}
+	snap := a.Ctx.LastSnapshot()
+	if snap == nil {
+		return 0, 0, 0
+	}
+	return snap.TotalTokens + snap.ToolTokens, snap.TotalTokens, snap.ToolTokens
+}
+
+func (a *Agent) stepForWire() int {
+	if a.Ctx == nil {
+		return 0
+	}
+	if snap := a.Ctx.LastSnapshot(); snap != nil {
+		return snap.Step
+	}
+	return 0
+}
+
+// LastWire returns a copy-safe pointer to the last wire record (may be nil).
+func (a *Agent) LastWire() *WireRecord {
+	a.lastWireMu.Lock()
+	defer a.lastWireMu.Unlock()
+	return a.lastWire
+}
+
+func (a *Agent) emitWireRequest(req llm.ChatRequest) {
+	if a.Bus == nil {
+		return
+	}
+	est, snapTotal, snapTools := a.wireTokenEstimate()
+	sum := llm.DescribeRequest(req, a.Provider.Name(), a.Provider.Model())
+	data := observability.WireRequestData{
+		Provider:              sum.Provider,
+		Model:                 sum.Model,
+		Stream:                a.Stream,
+		Stage:                 "provider_payload",
+		MessageCount:          sum.MessageCount,
+		ToolCount:             sum.ToolCount,
+		ContentBytes:          sum.ContentBytes,
+		SchemaBytes:           sum.SchemaBytes,
+		Temperature:           sum.Temperature,
+		MaxTokens:             sum.MaxTokens,
+		EstimatedPromptTokens: est,
+		SnapshotTotalTokens:   snapTotal,
+		SnapshotToolTokens:    snapTools,
+		Messages:              make([]observability.WireMessageInfo, 0, len(sum.Messages)),
+		Tools:                 make([]observability.WireToolInfo, 0, len(sum.Tools)),
+	}
+	for _, m := range sum.Messages {
+		data.Messages = append(data.Messages, observability.WireMessageInfo{
+			Index:          m.Index,
+			Role:           m.Role,
+			ContentLen:     m.ContentLen,
+			ContentPreview: m.ContentPreview,
+			ToolCallID:     m.ToolCallID,
+			ToolCalls:      m.ToolCalls,
+		})
+	}
+	for _, t := range sum.Tools {
+		data.Tools = append(data.Tools, observability.WireToolInfo{
+			Name:           t.Name,
+			SchemaBytes:    t.SchemaBytes,
+			DescriptionLen: t.DescriptionLen,
+		})
+	}
+	step := data.SnapshotTotalTokens // placeholder avoid unused; step from snapshot
+	if a.Ctx != nil {
+		if snap := a.Ctx.LastSnapshot(); snap != nil {
+			step = snap.Step
+		}
+	}
+	_ = step
+	a.emit(observability.EventLLMWireRequest, data)
+}
+
+// finishWireUsage records provider prompt_tokens on the last wire record.
+func (a *Agent) finishWireUsage(promptTokens int) {
+	a.lastWireMu.Lock()
+	rec := a.lastWire
+	a.lastWireMu.Unlock()
+	if rec == nil || promptTokens <= 0 {
+		return
+	}
+	rec.ProviderPromptTokens = promptTokens
+	rec.PromptTokenDelta = promptTokens - rec.EstimatedPromptTokens
 }
 
 // chatWithProvider uses StreamingProvider when Stream is on; otherwise Chat.
@@ -551,17 +704,31 @@ func (a *Agent) emitLLMFinished(req llm.ChatRequest, resp *llm.ChatResponse, ela
 	if preview == "" && len(resp.ToolCalls) > 0 {
 		preview = fmt.Sprintf("tool_calls: %d", len(resp.ToolCalls))
 	}
+	est, _, _ := a.wireTokenEstimate()
+	providerIn := 0
+	if resp != nil {
+		providerIn = resp.Usage.PromptTokens
+	}
+	delta := 0
+	if est > 0 && providerIn > 0 {
+		delta = providerIn - est
+	}
+	a.finishWireUsage(providerIn)
 	a.emit(observability.EventLLMRequestFinished, observability.LLMRequestData{
-		Provider:       a.Provider.Name(),
-		Model:          a.Provider.Model(),
-		MessageCount:   len(req.Messages),
-		InputTokens:    resp.Usage.PromptTokens,
-		OutputTokens:   resp.Usage.CompletionTokens,
-		TotalTokens:    resp.Usage.TotalTokens,
-		DurationMS:     elapsed.Milliseconds(),
-		ContentPreview: preview,
-		Streamed:       streamed,
-		TTFTMS:         a.lastTTFT.Milliseconds(),
+		Provider:              a.Provider.Name(),
+		Model:                 a.Provider.Model(),
+		MessageCount:          len(req.Messages),
+		InputTokens:           resp.Usage.PromptTokens,
+		OutputTokens:          resp.Usage.CompletionTokens,
+		TotalTokens:           resp.Usage.TotalTokens,
+		DurationMS:            elapsed.Milliseconds(),
+		ContentPreview:        preview,
+		Streamed:              streamed,
+		TTFTMS:                a.lastTTFT.Milliseconds(),
+		EstimatedPromptTokens: est,
+		PromptTokenDelta:      delta,
+		WireMessageCount:      len(req.Messages),
+		WireToolCount:         len(req.Tools),
 	})
 }
 

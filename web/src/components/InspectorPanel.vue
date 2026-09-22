@@ -35,7 +35,10 @@ function isDeeplink(e: RuntimeEvent): boolean {
     t === "tool.started" ||
     t === "tool.finished" ||
     t === "tool.failed" ||
-    t === "tool.requested"
+    t === "tool.requested" ||
+    t === "llm.wire_request" ||
+    t === "llm.request_finished" ||
+    t === "llm.request_started"
   );
 }
 
@@ -45,6 +48,13 @@ function deeplinkTitle(e: RuntimeEvent): string | undefined {
   if (e.type === "instruction.loaded") return "Instructions";
   if (e.type === "file.changed") return "Diff / path";
   if (e.type.startsWith("tool.")) return "tool call detail (args / result)";
+  if (
+    e.type === "llm.wire_request" ||
+    e.type === "llm.request_finished" ||
+    e.type === "llm.request_started"
+  ) {
+    return "wire request view";
+  }
   return "Skill / Plan";
 }
 

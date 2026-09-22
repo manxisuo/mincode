@@ -1,5 +1,5 @@
 // DecisionLevel is the result of policy evaluation for one tool call.
-type DecisionLevel string
+package permission
 
 const (
 	// Allow runs the tool without prompting.

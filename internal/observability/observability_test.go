@@ -1,1 +1,1 @@
-// (placeholder - see ctxmgr/diff and agent tests for T-obs-2 coverage)
+package observability

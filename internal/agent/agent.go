@@ -283,6 +283,9 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 					Count:     repeats,
 					Arguments: tc.Arguments,
 				})
+				a.emitDecision("loop", "stop", tc.Name, "max_loop_repeats",
+					fmt.Sprintf("same tool+args repeated %d times (limit %d)", repeats, maxLoopRepeats),
+					[]string{fmt.Sprintf("tool=%s", tc.Name), fmt.Sprintf("count=%d", repeats)})
 				a.setState(StateFailed)
 				return &Result{State: StateFailed}, fmt.Errorf("%w: %s x%d", LoopDetected, tc.Name, repeats)
 			}
@@ -350,6 +353,7 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 		Summary:   summary,
 		Level:     level.String(),
 	})
+	a.emitDecision("permission", level.String(), tc.Name, shellPolicyName(tc.Name), decisionReason(tc.Name, level), []string{"summary=" + summary})
 
 	denied, perr := permission.Evaluate(a.Policy, a.Approver, req)
 	if denied {
@@ -520,6 +524,37 @@ func (a *Agent) emitLLMStarted(req llm.ChatRequest) {
 		MessageCount: len(req.Messages),
 	})
 	a.emitWireRequest(req)
+}
+
+// emitDecision records one Runtime decision (T-obs-4). Never model thoughts.
+func (a *Agent) emitDecision(domain, action, target, policy, reason string, evidence []string) {
+	if a.Bus == nil {
+		return
+	}
+	a.emit(observability.EventDecision, observability.DecisionData{
+		Domain:   domain,
+		Action:   action,
+		Target:   target,
+		Policy:   policy,
+		Reason:   reason,
+		Evidence: evidence,
+	})
+}
+
+func shellPolicyName(tool string) string {
+	if tool == "shell" {
+		return "shell_classify"
+	}
+	return "default_tool_level"
+}
+
+func decisionReason(tool string, lvl permission.Level) string {
+	switch tool {
+	case "shell":
+		return "ClassifyShell → " + lvl.String()
+	default:
+		return "DefaultPolicy.Evaluate → " + lvl.String()
+	}
 }
 
 // emitContextDiff publishes T-obs-2 causal diff for the latest snapshot.

@@ -26,6 +26,22 @@ var parallelSafeTools = map[string]bool{
 
 func isParallelSafe(name string) bool { return parallelSafeTools[name] }
 
+// parallelReason explains why a batch was parallelized or kept serial (T-obs-4).
+func parallelReason(batchSize, maxParallel int, allSafe bool) (action, reason string, evidence []string) {
+	evidence = []string{
+		fmt.Sprintf("batch_size=%d", batchSize),
+		fmt.Sprintf("max_parallel=%d", maxParallel),
+		fmt.Sprintf("all_parallel_safe=%v", allSafe),
+	}
+	if allSafe && batchSize > 1 {
+		return "parallelize", "all tools ParallelSafe=true and max_parallel allows concurrency", evidence
+	}
+	if batchSize <= 1 {
+		return "serial", "single tool call — no batch", evidence
+	}
+	return "serial", "at least one tool is not ParallelSafe (write/shell keep serial)", evidence
+}
+
 // toolGroup is a batch of tool calls that share one execution strategy.
 type toolGroup struct {
 	calls    []llm.ToolCall

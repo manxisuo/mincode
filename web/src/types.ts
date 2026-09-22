@@ -6,6 +6,15 @@ export interface RuntimeEvent {
   data?: Record<string, unknown>;
 }
 
+export interface DecisionRecord {
+  domain: string;
+  action: string;
+  target?: string;
+  policy?: string;
+  reason: string;
+  evidence?: string[];
+}
+
 export interface ContextProvenance {
   source: string;
   tool?: string;

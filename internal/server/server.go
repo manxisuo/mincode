@@ -112,6 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/context", s.handleContext)
 	mux.HandleFunc("GET /api/wire", s.handleWire)
+	mux.HandleFunc("GET /api/decisions", s.handleDecisions)
 	mux.HandleFunc("GET /api/metrics", s.handleMetrics)
 	mux.HandleFunc("GET /api/timeline", s.handleTimeline)
 	mux.HandleFunc("GET /api/traces", s.handleTraceList)

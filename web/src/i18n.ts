@@ -189,6 +189,16 @@ const enUS = {
   "insp.diffNone": "No budget action this build",
   "insp.policy": "policy",
   "insp.saved": "saved",
+  "decision.title": "Runtime decisions",
+  "decision.empty": "No policy/parallel/loop decisions yet",
+  "decision.note": "Runtime rules only — not model hidden reasoning",
+  "decision.domain": "domain",
+  "decision.action": "action",
+  "decision.target": "target",
+  "decision.policy": "policy",
+  "decision.reason": "reason",
+  "decision.evidence": "evidence",
+  "decision.chain": "rule → hit → decision",
 };
 
 const zhCN: Record<keyof typeof enUS, string> = {
@@ -371,6 +381,16 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "insp.diffNone": "本次构建无预算动作",
   "insp.policy": "策略",
   "insp.saved": "节省",
+  "decision.title": "Runtime 决策",
+  "decision.empty": "尚无 permission / parallel / loop 决策记录",
+  "decision.note": "仅 Runtime 规则，不含模型隐藏推理",
+  "decision.domain": "域",
+  "decision.action": "动作",
+  "decision.target": "目标",
+  "decision.policy": "策略",
+  "decision.reason": "原因",
+  "decision.evidence": "证据",
+  "decision.chain": "规则 → 命中 → 结论",
 };
 
 const dict = {

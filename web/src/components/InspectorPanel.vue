@@ -237,6 +237,31 @@ const diffChanges = computed(() => {
   return entries.filter((e) => e.change && e.change !== "kept");
 });
 
+/** Runtime decision traces from live/history events (T-obs-4). */
+const decisionRows = computed(() => {
+  const out: Array<{
+    domain: string;
+    action: string;
+    target?: string;
+    policy?: string;
+    reason: string;
+    evidence?: string[];
+  }> = [];
+  for (const e of displayEvents.value) {
+    if (e.type !== "decision.recorded") continue;
+    const d = e.data || {};
+    out.push({
+      domain: String(d.domain || ""),
+      action: String(d.action || ""),
+      target: d.target != null ? String(d.target) : undefined,
+      policy: d.policy != null ? String(d.policy) : undefined,
+      reason: String(d.reason || ""),
+      evidence: Array.isArray(d.evidence) ? (d.evidence as string[]) : undefined,
+    });
+  }
+  return out.slice(-40);
+});
+
 // --- Timeline: live SSE events vs historical trace JSONL ---
 const tlMode = ref<"live" | "history">("live");
 const showRawJson = ref(false);
@@ -537,6 +562,23 @@ function rawJson(e: RuntimeEvent) {
             </div>
           </div>
         </div>
+        <div class="dl-subhead">
+            {{ t("decision.title") }}
+            <span class="hint">{{ t("decision.note") }}</span>
+          </div>
+          <div v-if="decisionRows.length" class="ctx-diff-rows">
+            <div v-for="(d, i) in decisionRows" :key="'dec' + i" class="ctx-diff-row" data-change="decision">
+              <span class="ch">{{ d.domain }}</span>
+              <span class="src">{{ d.action }}</span>
+              <span class="pv" :title="d.target">{{ d.target }}</span>
+              <span v-if="d.policy" class="pl">{{ d.policy }}</span>
+              <span class="rs">{{ d.reason }}</span>
+              <span v-if="d.evidence?.length" class="sv">{{ d.evidence.join("; ") }}</span>
+            </div>
+          </div>
+          <div v-else class="empty">{{ t("decision.empty") }}</div>
+        </div>
+
         <template v-for="run in ctxRuns" :key="run.id">
           <div
             class="ctx-row ctx-row-summary"

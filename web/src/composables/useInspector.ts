@@ -45,6 +45,9 @@ function previewData(data?: Record<string, unknown>): string {
   if (data.operation != null && data.path != null) {
     return `${data.operation} ${data.path}`;
   }
+  if (data.domain != null && data.action != null) {
+    return `${data.domain} ${data.action} ${data.target || ""} ${data.policy || ""}`;
+  }
   if (data.stage != null && data.message_count != null) {
     return `stage=${data.stage} msgs=${data.message_count} tools=${data.tool_count ?? 0} est=${data.estimated_prompt_tokens ?? "—"}`;
   }

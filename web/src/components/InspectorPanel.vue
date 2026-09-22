@@ -562,7 +562,8 @@ function rawJson(e: RuntimeEvent) {
             </div>
           </div>
         </div>
-        <div class="dl-subhead">
+        <div class="ctx-decisions">
+          <div class="dl-subhead">
             {{ t("decision.title") }}
             <span class="hint">{{ t("decision.note") }}</span>
           </div>

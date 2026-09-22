@@ -264,6 +264,22 @@ type LoopDetectedData struct {
 	Arguments string `json:"arguments,omitempty"`
 }
 
+// DecisionData is one Runtime decision (T-obs-4). Never model hidden reasoning.
+type DecisionData struct {
+	// Domain is permission | parallel | loop | policy | shell
+	Domain string `json:"domain"`
+	// Action is the outcome (allow/ask/deny/parallelize/serial/stop…).
+	Action string `json:"action"`
+	// Target is the tool/command/path this decision applies to.
+	Target string `json:"target,omitempty"`
+	// Policy is the rule name that fired (e.g. destructive_shell_pattern).
+	Policy string `json:"policy,omitempty"`
+	// Reason is the human-readable rule explanation (must match code paths).
+	Reason string `json:"reason"`
+	// Evidence lists machine-checkable facts used by the rule.
+	Evidence []string `json:"evidence,omitempty"`
+}
+
 // PermissionData is payload for permission.* events.
 type PermissionData struct {
 	ID        string `json:"id,omitempty"`

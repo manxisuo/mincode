@@ -21,6 +21,9 @@ type CompactionResult struct {
 	Compressed   int    `json:"compressed"`
 	Preserved    int    `json:"preserved"`
 	Pinned       int    `json:"pinned"`
+	SavedTokens  int    `json:"saved_tokens,omitempty"`
+	Policy       string `json:"policy,omitempty"`
+	Reason       string `json:"reason,omitempty"`
 	Summary      string `json:"summary"`
 }
 
@@ -86,6 +89,11 @@ func (m *Manager) Compact() *CompactionResult {
 		Preserved:    len(recent),
 		Pinned:       pinned,
 		Summary:      summary,
+		SavedTokens:  before - after,
+		Policy:       "compact_old_history_keep_recent",
+		Reason: fmt.Sprintf(
+			"history tokens %d exceeded compress_at=%d; folded %d older entry(ies) into summary, kept %d recent",
+			before, m.compressAt, len(old), len(recent)),
 	}
 	return res
 }

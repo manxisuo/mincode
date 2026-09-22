@@ -35,6 +35,12 @@ type Item struct {
 	Pinned     bool   `json:"pinned"`
 	Reason     string `json:"reason,omitempty"`
 	ToolCallID string `json:"tool_call_id,omitempty"`
+	// Policy names the Runtime rule that excluded/truncated this item (T-obs-2).
+	Policy string `json:"policy,omitempty"`
+	// OrigTokens is estimated size before exclusion/truncation.
+	OrigTokens int `json:"orig_tokens,omitempty"`
+	// SavedTokens is how much the budget action saved (exclude/truncate).
+	SavedTokens int `json:"saved_tokens,omitempty"`
 }
 
 // Snapshot is a record of what the model will see on one LLM call.
@@ -55,6 +61,10 @@ type Snapshot struct {
 	EstimateRatio float64 `json:"estimate_ratio,omitempty"`
 	// RequestFailed marks that the LLM call for this snapshot failed (no usage).
 	RequestFailed bool `json:"request_failed,omitempty"`
+	// Notes are Runtime budget/compaction explanations for this build (T-obs-2).
+	Notes []string `json:"notes,omitempty"`
+	// Diff vs previous snapshot in the same Manager (nil on first build).
+	Diff *SnapshotDiff `json:"diff,omitempty"`
 }
 
 // Summary returns a multi-line human-readable breakdown.

@@ -20,6 +20,8 @@ const (
 	EventContextBuilt           EventType = "context.built"
 	EventContextCompactionStart EventType = "context.compaction_started"
 	EventContextCompacted       EventType = "context.compacted"
+	// EventContextDiff explains ± vs previous build (T-obs-2).
+	EventContextDiff EventType = "context.diff"
 
 	EventLLMRequestStarted  EventType = "llm.request_started"
 	EventLLMRequestFinished EventType = "llm.request_finished"
@@ -205,7 +207,28 @@ type CompactionData struct {
 	Compressed     int    `json:"compressed"`
 	Preserved      int    `json:"preserved"`
 	Pinned         int    `json:"pinned"`
+	SavedTokens    int    `json:"saved_tokens,omitempty"`
+	Policy         string `json:"policy,omitempty"`
+	Reason         string `json:"reason,omitempty"`
 	SummaryPreview string `json:"summary_preview,omitempty"`
+}
+
+// ContextDiffData is payload for context.diff (T-obs-2).
+type ContextDiffData struct {
+	FromStep      int      `json:"from_step,omitempty"`
+	ToStep        int      `json:"to_step"`
+	Added         int      `json:"added"`
+	Removed       int      `json:"removed"`
+	Kept          int      `json:"kept"`
+	ExcludedNow   int      `json:"excluded_now"`
+	TruncatedNow  int      `json:"truncated_now"`
+	Reincluded    int      `json:"reincluded"`
+	SavedTokens   int      `json:"saved_tokens"`
+	FromTotal     int      `json:"from_total_tokens"`
+	ToTotal       int      `json:"to_total_tokens"`
+	Budget        int      `json:"budget"`
+	Notes         []string `json:"notes,omitempty"`
+	ChangePreview []string `json:"change_preview,omitempty"`
 }
 
 // ToolEventData is payload for tool.* events.

@@ -42,6 +42,59 @@ func TestPreviewOfPreservesMultilineAndCaps(t *testing.T) {
 	}
 }
 
+func TestDiffSnapshotsExplainsExclusion(t *testing.T) {
+	m := New("SYS", "", 12)
+	m.AppendUser("one message here")
+	_, s1 := m.BuildRequest(nil)
+	if s1.Diff == nil {
+		t.Fatal("missing first diff")
+	}
+	m.AppendUser("two message here")
+	m.AppendAssistant(llm.Message{Role: llm.RoleAssistant, Content: "reply one"})
+	m.AppendUser("three message here")
+	_, s2 := m.BuildRequest(nil)
+	if s2.Diff == nil {
+		t.Fatal("missing second diff")
+	}
+	if s2.Diff.ToStep != s2.Step {
+		t.Fatalf("diff to_step=%d snap=%d", s2.Diff.ToStep, s2.Step)
+	}
+	// Tiny budget should force exclusions with policy + notes.
+	if s2.Excluded == 0 {
+		t.Skip("no exclusion in this budget; notes still present")
+	}
+	if len(s2.Notes) == 0 {
+		t.Fatal("missing budget notes")
+	}
+	foundPolicy := false
+	for _, it := range s2.Items {
+		if it.Excluded && it.Policy != "" {
+			foundPolicy = true
+			if it.SavedTokens <= 0 && it.OrigTokens <= 0 {
+				t.Fatalf("excluded item missing saved/orig tokens: %+v", it)
+			}
+		}
+	}
+	if !foundPolicy {
+		t.Fatal("excluded items missing policy")
+	}
+}
+
+func TestDiffSnapshotsAddedItem(t *testing.T) {
+	m := New("SYS", "", 10000)
+	m.AppendUser("first")
+	_, s1 := m.BuildRequest(nil)
+	m.AppendUser("second")
+	_, s2 := m.BuildRequest(nil)
+	d := s2.Diff
+	if d == nil || d.Added < 1 {
+		t.Fatalf("diff=%+v want added", d)
+	}
+	if d.ExcludedNow != 0 && d.FromTotal > d.ToTotal {
+		t.Fatalf("unexpected shrink without exclusion: %+v", d)
+	}
+}
+
 func TestBuildRequestIncludesSystemAndUser(t *testing.T) {
 	m := New("SYS", "", 10000)
 	m.AppendUser("hi there")

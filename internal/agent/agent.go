@@ -203,6 +203,9 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 				Compressed:     cr.Compressed,
 				Preserved:      cr.Preserved,
 				Pinned:         cr.Pinned,
+				SavedTokens:    cr.SavedTokens,
+				Policy:         cr.Policy,
+				Reason:         cr.Reason,
 				SummaryPreview: preview,
 			})
 		}
@@ -218,6 +221,7 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 			Excluded:    snap.Excluded,
 			Truncated:   snap.Truncated,
 		})
+		a.emitContextDiff(&snap)
 
 		a.setState(StateCallingLLM)
 		a.emitLLMStarted(req)
@@ -512,6 +516,37 @@ func (a *Agent) emitLLMStarted(req llm.ChatRequest) {
 		MessageCount: len(req.Messages),
 	})
 	a.emitWireRequest(req)
+}
+
+// emitContextDiff publishes T-obs-2 causal diff for the latest snapshot.
+func (a *Agent) emitContextDiff(snap *ctxmgr.Snapshot) {
+	if a.Bus == nil || snap == nil || snap.Diff == nil {
+		return
+	}
+	d := snap.Diff
+	lines := make([]string, 0, len(d.Entries))
+	for _, e := range d.Entries {
+		if e.Change == ctxmgr.DiffKept {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s %s %s", e.Change, e.Source, e.Reason))
+	}
+	a.emit(observability.EventContextDiff, observability.ContextDiffData{
+		FromStep:      d.FromStep,
+		ToStep:        d.ToStep,
+		Added:         d.Added,
+		Removed:       d.Removed,
+		Kept:          d.Kept,
+		ExcludedNow:   d.ExcludedNow,
+		TruncatedNow:  d.TruncatedNow,
+		Reincluded:    d.Reincluded,
+		SavedTokens:   d.SavedTokens,
+		FromTotal:     d.FromTotal,
+		ToTotal:       d.ToTotal,
+		Budget:        d.Budget,
+		Notes:         d.Notes,
+		ChangePreview: lines,
+	})
 }
 
 // recordWire stores the provider-bound request after Context Builder.

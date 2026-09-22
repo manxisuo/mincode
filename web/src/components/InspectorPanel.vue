@@ -225,6 +225,12 @@ const ctxTotal = computed(() => {
   return (s.total_tokens || 0) + (s.tool_tokens || 0);
 });
 
+/** Non-kept rows from the snapshot diff for display. */
+const diffChanges = computed(() => {
+  const entries = props.snapshot?.diff?.entries || [];
+  return entries.filter((e) => e.change && e.change !== "kept");
+});
+
 // --- Timeline: live SSE events vs historical trace JSONL ---
 const tlMode = ref<"live" | "history">("live");
 const showRawJson = ref(false);
@@ -493,6 +499,38 @@ function rawJson(e: RuntimeEvent) {
     <div class="context">
       <div v-if="!ctxRuns.length" class="empty">{{ t("insp.noSnap") }}</div>
       <template v-else>
+        <div v-if="snapshot?.notes?.length" class="ctx-notes">
+          <div class="dl-subhead">{{ t("insp.notesTitle") }}</div>
+          <ul class="ctx-notes-list">
+            <li v-for="(n, i) in snapshot.notes" :key="i">{{ n }}</li>
+          </ul>
+        </div>
+        <div v-if="snapshot?.diff" class="ctx-diff">
+          <div class="dl-subhead">
+            {{ t("insp.diffTitle") }}
+            <span class="hint">
+              {{ t("insp.diffVs") }} {{ snapshot.diff.from_step ?? "—" }}
+              → {{ snapshot.diff.to_step }}
+              · {{ t("insp.diffAdded") }} {{ snapshot.diff.added ?? 0 }}
+              · {{ t("insp.diffExcluded") }} {{ snapshot.diff.excluded_now ?? 0 }}
+              · {{ t("insp.diffTrunc") }} {{ snapshot.diff.truncated_now ?? 0 }}
+              · {{ t("insp.diffSaved") }} {{ snapshot.diff.saved_tokens ?? 0 }}
+            </span>
+          </div>
+          <div v-if="snapshot.diff.notes?.length" class="ctx-notes-list">
+            <div v-for="(n, i) in snapshot.diff.notes" :key="'d' + i">{{ n }}</div>
+          </div>
+          <div v-if="diffChanges.length" class="ctx-diff-rows">
+            <div v-for="(e, i) in diffChanges" :key="i" class="ctx-diff-row" :data-change="e.change">
+              <span class="ch">{{ e.change }}</span>
+              <span class="src">{{ e.source }}</span>
+              <span class="pv">{{ e.preview }}</span>
+              <span v-if="e.reason" class="rs">{{ e.reason }}</span>
+              <span v-if="e.policy" class="pl">{{ t("insp.policy") }}={{ e.policy }}</span>
+              <span v-if="e.saved_tokens" class="sv">-{{ e.saved_tokens }} tok</span>
+            </div>
+          </div>
+        </div>
         <template v-for="run in ctxRuns" :key="run.id">
           <div
             class="ctx-row ctx-row-summary"

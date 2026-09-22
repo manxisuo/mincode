@@ -178,6 +178,17 @@ const enUS = {
   "wire.messagesTitle": "Messages",
   "wire.toolsTitle": "Tools",
   "wire.empty": "No wire request recorded yet",
+  "insp.notesTitle": "Budget / policy notes",
+  "insp.diffTitle": "Context diff",
+  "insp.diffVs": "vs step",
+  "insp.diffAdded": "added",
+  "insp.diffRemoved": "removed",
+  "insp.diffExcluded": "excluded now",
+  "insp.diffTrunc": "truncated now",
+  "insp.diffSaved": "saved",
+  "insp.diffNone": "No budget action this build",
+  "insp.policy": "policy",
+  "insp.saved": "saved",
 };
 
 const zhCN: Record<keyof typeof enUS, string> = {
@@ -349,6 +360,17 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "wire.messagesTitle": "消息",
   "wire.toolsTitle": "工具",
   "wire.empty": "尚无 Wire 请求记录",
+  "insp.notesTitle": "预算 / 策略说明",
+  "insp.diffTitle": "上下文 Diff",
+  "insp.diffVs": "对比 step",
+  "insp.diffAdded": "新增",
+  "insp.diffRemoved": "移除",
+  "insp.diffExcluded": "新排除",
+  "insp.diffTrunc": "新截断",
+  "insp.diffSaved": "节省",
+  "insp.diffNone": "本次构建无预算动作",
+  "insp.policy": "策略",
+  "insp.saved": "节省",
 };
 
 const dict = {

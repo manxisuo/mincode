@@ -357,17 +357,17 @@ func (s *Server) handleContext(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	res := s.lastResult
 	s.mu.Unlock()
-	if res == nil || res.Snapshot == nil {
-		if s.agent != nil && s.agent.Ctx != nil {
-			if snap := s.agent.Ctx.LastSnapshot(); snap != nil {
-				writeJSON(w, http.StatusOK, snap)
-				return
-			}
-		}
+	var snap *ctxmgr.Snapshot
+	if res != nil && res.Snapshot != nil {
+		snap = res.Snapshot
+	} else if s.agent != nil && s.agent.Ctx != nil {
+		snap = s.agent.Ctx.LastSnapshot()
+	}
+	if snap == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "total_tokens": 0})
 		return
 	}
-	writeJSON(w, http.StatusOK, res.Snapshot)
+	writeJSON(w, http.StatusOK, snap)
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {

@@ -17,6 +17,37 @@ export interface ContextItem {
   pinned?: boolean;
   reason?: string;
   tool_call_id?: string;
+  policy?: string;
+  orig_tokens?: number;
+  saved_tokens?: number;
+}
+
+export interface ContextDiffEntry {
+  change: string;
+  source: string;
+  role?: string;
+  preview?: string;
+  tokens?: number;
+  reason?: string;
+  policy?: string;
+  saved_tokens?: number;
+}
+
+export interface ContextDiff {
+  from_step?: number;
+  to_step?: number;
+  added?: number;
+  removed?: number;
+  kept?: number;
+  excluded_now?: number;
+  truncated_now?: number;
+  reincluded?: number;
+  saved_tokens?: number;
+  from_total_tokens?: number;
+  to_total_tokens?: number;
+  budget?: number;
+  notes?: string[];
+  entries?: ContextDiffEntry[];
 }
 
 export interface ContextSnapshot {
@@ -28,6 +59,8 @@ export interface ContextSnapshot {
   included_count?: number;
   excluded_count?: number;
   truncated_count?: number;
+  notes?: string[];
+  diff?: ContextDiff | null;
 }
 
 export interface SessionInfo {

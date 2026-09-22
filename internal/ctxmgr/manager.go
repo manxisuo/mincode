@@ -32,6 +32,7 @@ type Manager struct {
 	entries      []entry
 	step         int
 	lastSnapshot *Snapshot
+	prevSnapshot *Snapshot
 	cal          *Calibrator
 }
 
@@ -347,6 +348,7 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 				continue
 			}
 			parts[i].msg.Content = newContent
+			parts[i].origTok = parts[i].tok
 			parts[i].tok = newTok
 			parts[i].truncated = true
 			total -= saved
@@ -369,11 +371,14 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 			Tokens:     p.tok,
 			ToolCallID: p.msg.ToolCallID,
 			Pinned:     p.pin,
+			OrigTokens: p.tok,
 		}
 		if p.excluded {
 			it.Included = false
 			it.Excluded = true
 			it.Reason = "token budget"
+			it.Policy = "drop_oldest_non_pinned"
+			it.SavedTokens = p.tok
 			it.Tokens = 0
 			items = append(items, it)
 			excludedN++
@@ -382,6 +387,11 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 		if p.truncated {
 			it.Truncated = true
 			it.Reason = "tool result budget limit"
+			it.Policy = "tool_result_max_tokens"
+			// p.tok is after truncate; saved is orig − new when known.
+			if p.origTok > 0 && p.origTok > p.tok {
+				it.SavedTokens = p.origTok - p.tok
+			}
 			truncatedN++
 		}
 		it.Included = true
@@ -417,6 +427,30 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 		Excluded:    excludedN,
 		Truncated:   truncatedN,
 	}
+	// T-obs-2: explain budget actions and diff vs previous build.
+	notes := []string{}
+	if excludedN > 0 {
+		saved := 0
+		for _, it := range items {
+			if it.Excluded {
+				saved += it.SavedTokens
+			}
+		}
+		notes = append(notes, fmt.Sprintf(
+			"excluded %d item(s) policy=drop_oldest_non_pinned, saved≈%d tokens (msg budget=%d, projected was over)",
+			excludedN, saved, msgBudget))
+	}
+	if truncatedN > 0 {
+		notes = append(notes, fmt.Sprintf(
+			"truncated %d tool_result item(s) policy=tool_result_max_tokens",
+			truncatedN))
+	}
+	if len(notes) == 0 {
+		notes = append(notes, fmt.Sprintf("fit in budget (total=%d, msg_budget=%d)", finalTotal, msgBudget))
+	}
+	snap.Notes = notes
+	snap.Diff = DiffSnapshots(m.prevSnapshot, &snap)
+	m.prevSnapshot = m.lastSnapshot
 	m.lastSnapshot = &snap
 
 	return llm.ChatRequest{Messages: messages, Tools: tools}, snap

@@ -493,6 +493,43 @@ button.linkish:hover:not(:disabled) {
 }
 .ctx-total b { color: var(--ink); }
 
+.ctx-notes,
+.ctx-diff {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.ctx-notes-list {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  color: var(--muted);
+}
+.ctx-diff-rows {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow: auto;
+}
+.ctx-diff-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  word-break: break-all;
+}
+.ctx-diff-row .ch { color: var(--accent); min-width: 7em; }
+.ctx-diff-row[data-change="excluded_now"] .ch,
+.ctx-diff-row[data-change="removed"] .ch { color: var(--warn); }
+.ctx-diff-row[data-change="truncated_now"] .ch { color: var(--warn); }
+.ctx-diff-row .src { color: var(--ink); }
+.ctx-diff-row .pv { color: var(--muted); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctx-diff-row .rs { color: var(--muted); }
+.ctx-diff-row .sv { color: var(--ok); margin-left: auto; }
+
 .timeline {
   flex: 1 1 auto;
   min-height: 140px;

@@ -411,6 +411,8 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 	}
 
 	a.loadInstructionsForTool(tc, result)
+	// Called after AppendToolResult so the meta sticks to the tool_result entry.
+	a.Ctx.SetMeta(tc.Name, tc.Name, metaPath, "", int(a.Ctx.LastStep()))
 
 	preview := result.Content
 	if len(preview) > toolPreviewLen {
@@ -427,6 +429,8 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 	if result.IsError {
 		data.Error = result.Content
 	}
+	// T-obs-3: attach lineage meta to the tool_result entry (after Append).
+	a.Ctx.SetMeta(tc.Name, tc.Name, metaPath, "", a.Ctx.LastStep()+1)
 	a.emit(observability.EventToolFinished, data)
 	return result, nil
 }

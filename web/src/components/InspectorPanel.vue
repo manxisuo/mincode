@@ -95,6 +95,9 @@ type ItemRow = {
   truncated: boolean;
   pinned: boolean;
   reason?: string;
+  policy?: string;
+  saved?: number;
+  prov?: ContextItem["prov"];
 };
 
 type RunRow = {
@@ -136,6 +139,9 @@ function toItemRow(i: ContextItem, index: number): ItemRow {
     truncated: !!i.truncated,
     pinned: !!i.pinned,
     reason: i.reason,
+    policy: i.policy,
+    saved: i.saved_tokens,
+    prov: i.prov,
   };
 }
 
@@ -576,7 +582,18 @@ function rawJson(e: RuntimeEvent) {
                 <span v-else-if="item.truncated" class="tag warn">{{ t("insp.tagTruncated") }}</span>
                 <span v-else class="tag ok">{{ t("insp.tagIncluded") }}</span>
                 <span v-if="item.pinned" class="tag">{{ t("insp.tagPinned") }}</span>
+                <span v-if="item.policy" class="reason">{{ t("insp.policy") }}={{ item.policy }}</span>
+                <span v-if="item.saved" class="reason">{{ t("insp.saved") }}≈{{ item.saved }}</span>
                 <span v-if="item.reason" class="reason">{{ item.reason }}</span>
+              </div>
+              <div v-if="item.prov" class="d-prov">
+                <span v-if="item.prov.tool">tool={{ item.prov.tool }}</span>
+                <span v-if="item.prov.call_id">call={{ item.prov.call_id }}</span>
+                <span v-if="item.prov.path" :title="item.prov.path">{{ item.prov.path }}</span>
+                <span v-if="item.prov.lines">lines {{ item.prov.lines }}</span>
+                <span v-if="item.prov.produced_at_step">produced@{{ item.prov.produced_at_step }}</span>
+                <span v-if="item.prov.entered_at_step">entered@{{ item.prov.entered_at_step }}</span>
+                <span v-if="item.prov.transformed">{{ item.prov.transformed }}</span>
               </div>
               <div
                 class="d-preview"

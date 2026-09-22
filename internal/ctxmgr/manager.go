@@ -88,6 +88,39 @@ func (m *Manager) ObserveUsage(estimated, actualPromptTokens int) {
 	}
 }
 
+// LastStep returns the last BuildRequest step counter.
+func (m *Manager) LastStep() int {
+	if m == nil {
+		return 0
+	}
+	return m.step
+}
+
+// SetMeta attaches provenance metadata to the most recent matching entry
+// (typically the last tool_result). Used by the agent after tool execution.
+func (m *Manager) SetMeta(callID, tool, path, lines string, producedAtStep int) {
+	if m == nil || callID == "" {
+		return
+	}
+	for i := len(m.entries) - 1; i >= 0; i-- {
+		e := &m.entries[i]
+		if e.msg.ToolCallID == callID || (callID != "" && e.callID == callID) {
+			if tool != "" {
+				e.tool = tool
+			}
+			if path != "" {
+				e.path = path
+			}
+			if lines != "" {
+				e.lines = lines
+			}
+			e.callID = callID
+			e.prodStep = producedAtStep
+			return
+		}
+	}
+}
+
 // MarkRequestFailed flags the last snapshot as having no API usage (call failed).
 func (m *Manager) MarkRequestFailed() {
 	if m.lastSnapshot != nil {
@@ -258,10 +291,16 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 			src = SourceHistory
 		}
 		parts = append(parts, part{
-			msg:   e.msg,
-			src:   src,
-			tok:   e.tokens,
-			order: i + 1,
+			msg:       e.msg,
+			src:       src,
+			tok:       e.tokens,
+			order:     i + 1,
+			tool:      e.tool,
+			callID:    e.msg.ToolCallID,
+			path:      e.path,
+			lines:     e.lines,
+			prodStep:  e.prodStep,
+			enterStep: e.enterStep,
 		})
 	}
 
@@ -372,6 +411,25 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 			ToolCallID: p.msg.ToolCallID,
 			Pinned:     p.pin,
 			OrigTokens: p.tok,
+		}
+		// T-obs-3: lineage for tool results / history when known.
+		if p.src == SourceToolResult || p.tool != "" || p.callID != "" {
+			prov := &Provenance{
+				Source:         p.src,
+				Tool:           p.tool,
+				CallID:         p.callID,
+				Path:           p.path,
+				Lines:          p.lines,
+				ProducedAtStep: p.prodStep,
+				EnteredAtStep:  p.enterStep,
+			}
+			if p.enterStep == 0 {
+				prov.EnteredAtStep = m.step + 1
+			}
+			if p.truncated {
+				prov.Transformed = fmt.Sprintf("truncated %d→%d tokens (policy=tool_result_max_tokens)", p.origTok, p.tok)
+			}
+			it.Prov = prov
 		}
 		if p.excluded {
 			it.Included = false

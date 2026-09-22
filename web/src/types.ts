@@ -6,6 +6,17 @@ export interface RuntimeEvent {
   data?: Record<string, unknown>;
 }
 
+export interface ContextProvenance {
+  source: string;
+  tool?: string;
+  call_id?: string;
+  path?: string;
+  lines?: string;
+  produced_at_step?: number;
+  entered_at_step?: number;
+  transformed?: string;
+}
+
 export interface ContextItem {
   source: string;
   role?: string;
@@ -20,6 +31,7 @@ export interface ContextItem {
   policy?: string;
   orig_tokens?: number;
   saved_tokens?: number;
+  prov?: ContextProvenance;
 }
 
 export interface ContextDiffEntry {

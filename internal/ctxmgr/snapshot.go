@@ -23,6 +23,26 @@ const (
 	SourceSummary      Source = "summary"
 )
 
+// Provenance is T-obs-4 data lineage for one context item (L4).
+type Provenance struct {
+	// Source system | instructions | skills | memory | history | tool_result | user_input | pinned | summary
+	Source Source `json:"source"`
+	// Tool is the tool name that produced this content (tool_result).
+	Tool string `json:"tool,omitempty"`
+	// CallID is the LLM tool call id (tool_result).
+	CallID string `json:"call_id,omitempty"`
+	// Path is the workspace-relative file path when known (tool results).
+	Path string `json:"path,omitempty"`
+	// Lines is an optional "start-end" range when known.
+	Lines string `json:"lines,omitempty"`
+	// ProducedAtStep is when the tool/file event was produced (when known).
+	ProducedAtStep int `json:"produced_at_step,omitempty"`
+	// EnteredAtStep is when the item first entered a context snapshot (when known).
+	EnteredAtStep int `json:"entered_at_step,omitempty"`
+	// Transformed lists transforms applied (e.g. "truncated 8421→3200").
+	Transformed string `json:"transformed,omitempty"`
+}
+
 // Item is one context piece with provenance and budget outcome.
 type Item struct {
 	Source     Source `json:"source"`
@@ -41,6 +61,8 @@ type Item struct {
 	OrigTokens int `json:"orig_tokens,omitempty"`
 	// SavedTokens is how much the budget action saved (exclude/truncate).
 	SavedTokens int `json:"saved_tokens,omitempty"`
+	// Prov is optional data lineage (T-obs-3).
+	Prov *Provenance `json:"prov,omitempty"`
 }
 
 // Snapshot is a record of what the model will see on one LLM call.

@@ -95,6 +95,37 @@ func TestDiffSnapshotsAddedItem(t *testing.T) {
 	}
 }
 
+func TestToolResultProvenance(t *testing.T) {
+	m := New("SYS", "", 10000)
+	m.AppendUser("read the file")
+	m.AppendAssistant(llm.Message{
+		Role:      llm.RoleAssistant,
+		ToolCalls: []llm.ToolCall{{ID: "call_1", Name: "read_file", Arguments: `{"path":"a.go"}`}},
+	})
+	m.AppendToolResult("call_1", "package a\n// lots of code\nfunc X() {}")
+	m.SetMeta("call_1", "read_file", "a.go", "1-3", 7)
+	_, snap := m.BuildRequest(nil)
+	found := false
+	for _, it := range snap.Items {
+		if it.Source != SourceToolResult {
+			continue
+		}
+		found = true
+		if it.Prov == nil {
+			t.Fatalf("tool_result missing prov: %+v", it)
+		}
+		if it.Prov.Tool != "read_file" || it.Prov.CallID != "call_1" || it.Prov.Path != "a.go" {
+			t.Fatalf("prov=%+v", it.Prov)
+		}
+		if it.Prov.EnteredAtStep != snap.Step {
+			t.Fatalf("entered step=%d snap=%d", it.Prov.EnteredAtStep, snap.Step)
+		}
+	}
+	if !found {
+		t.Fatal("no tool_result item")
+	}
+}
+
 func TestBuildRequestIncludesSystemAndUser(t *testing.T) {
 	m := New("SYS", "", 10000)
 	m.AppendUser("hi there")

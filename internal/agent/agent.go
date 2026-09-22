@@ -401,7 +401,9 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 		return result, err
 	}
 
-	if metaPath, ok := result.Meta["path"].(string); ok && (tc.Name == "write_file" || tc.Name == "edit_file") {
+	metaPath := ""
+	if p, ok := result.Meta["path"].(string); ok && (tc.Name == "write_file" || tc.Name == "edit_file") {
+		metaPath = p
 		if !result.IsError {
 			op, _ := result.Meta["operation"].(string)
 			diff, _ := result.Meta["diff"].(string)
@@ -416,7 +418,7 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 
 	a.loadInstructionsForTool(tc, result)
 	// Called after AppendToolResult so the meta sticks to the tool_result entry.
-	a.Ctx.SetMeta(tc.Name, tc.Name, metaPath, "", int(a.Ctx.LastStep()))
+	a.Ctx.SetMeta(tc.Name, tc.Name, metaPath, "", a.Ctx.LastStep())
 
 	preview := result.Content
 	if len(preview) > toolPreviewLen {

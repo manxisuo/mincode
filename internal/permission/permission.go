@@ -1,11 +1,5 @@
-// DecisionLevel is the result of policy evaluation for one tool call.
 package permission
 
-const (
-	// Allow runs the tool without prompting.
-	Allow DecisionLevel = "allow"
-	// Ask requires interactive approval (web / stdin).
-	Ask DecisionLevel = "ask"
-	// Deny blocks the tool without calling the provider.
-	Deny DecisionLevel = "deny"
-)
+// Decision levels live in policy.go (Level: Allow / Ask / Deny).
+// This file is kept so the package always has a non-test source file
+// after T-obs-4 cleanups; do not redeclare Allow/Ask/Deny here.

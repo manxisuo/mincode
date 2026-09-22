@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/manxisuo/mincode/internal/agent"
+	"github.com/manxisuo/mincode/internal/ctxmgr"
 	"github.com/manxisuo/mincode/internal/experiment"
 	"github.com/manxisuo/mincode/internal/instruction"
 	"github.com/manxisuo/mincode/internal/memory"

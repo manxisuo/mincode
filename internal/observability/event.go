@@ -65,6 +65,7 @@ const (
 	EventPlanFinished     EventType = "plan.finished"
 
 	EventLoopDetected EventType = "loop.detected"
+	EventDecision     EventType = "decision.recorded"
 )
 
 // Event is a structured observation record.

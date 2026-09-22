@@ -16,9 +16,15 @@ const DefaultBudgetTokens = 32000
 const maxToolResultTokens = 2500
 
 type entry struct {
-	msg    llm.Message
-	source Source
-	tokens int
+	msg     llm.Message
+	source  Source
+	tokens  int
+	callID  string
+	tool    string
+	path    string
+	lines   string
+	prodStep  int
+	enterStep int
 }
 
 // Manager owns conversation state and builds budgeted LLM requests.
@@ -221,6 +227,13 @@ type part struct {
 	order     int // higher = more recent / more important
 	excluded  bool
 	truncated bool
+	origTok   int
+	tool      string
+	callID    string
+	path      string
+	lines     string
+	prodStep  int
+	enterStep int
 }
 
 // BuildRequest assembles a budgeted ChatRequest and records a Snapshot.
@@ -424,7 +437,7 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 				EnteredAtStep:  p.enterStep,
 			}
 			if p.enterStep == 0 {
-				prov.EnteredAtStep = m.step + 1
+				prov.EnteredAtStep = m.step
 			}
 			if p.truncated {
 				prov.Transformed = fmt.Sprintf("truncated %d→%d tokens (policy=tool_result_max_tokens)", p.origTok, p.tok)
@@ -507,8 +520,7 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 		notes = append(notes, fmt.Sprintf("fit in budget (total=%d, msg_budget=%d)", finalTotal, msgBudget))
 	}
 	snap.Notes = notes
-	snap.Diff = DiffSnapshots(m.prevSnapshot, &snap)
-	m.prevSnapshot = m.lastSnapshot
+	snap.Diff = DiffSnapshots(m.lastSnapshot, &snap)
 	m.lastSnapshot = &snap
 
 	return llm.ChatRequest{Messages: messages, Tools: tools}, snap

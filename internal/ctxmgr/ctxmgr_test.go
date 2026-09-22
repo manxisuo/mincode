@@ -83,7 +83,7 @@ func TestDiffSnapshotsExplainsExclusion(t *testing.T) {
 func TestDiffSnapshotsAddedItem(t *testing.T) {
 	m := New("SYS", "", 10000)
 	m.AppendUser("first")
-	_, s1 := m.BuildRequest(nil)
+	_, _ = m.BuildRequest(nil)
 	m.AppendUser("second")
 	_, s2 := m.BuildRequest(nil)
 	d := s2.Diff

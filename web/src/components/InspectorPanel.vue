@@ -115,6 +115,27 @@ type RunRow = {
 const expanded = ref<Set<string>>(new Set());
 /** Keys of individual context items whose full preview is open. */
 const expandedItems = ref<Set<string>>(new Set());
+/** Section collapse + split height (Context vs Timeline). */
+const ctxOpen = ref(true);
+const tlOpen = ref(true);
+const ctxSplit = ref(340);
+let splitDragY = 0;
+let splitDragH = 0;
+
+function startSplitDrag(ev: MouseEvent) {
+  splitDragY = ev.clientY;
+  splitDragH = ctxSplit.value;
+  const onMove = (e: MouseEvent) => {
+    const next = splitDragH + (e.clientY - splitDragY);
+    ctxSplit.value = Math.min(Math.max(120, next), Math.max(240, window.innerHeight - 260));
+  };
+  const onUp = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+  };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
 
 function truncatePreview(s: string, n = 72): string {
   const t = (s || "").replace(/\s+/g, " ").trim();
@@ -513,21 +534,22 @@ function rawJson(e: RuntimeEvent) {
       <div class="m"><span>Errors</span><b>{{ metrics.errors ?? 0 }}</b></div>
     </div>
 
-    <div class="subhead">
+    <div class="subhead togglable" @click="ctxOpen = !ctxOpen">
       <span>
+        <span class="chev">{{ ctxOpen ? "▾" : "▸" }}</span>
         {{ t("insp.ctx") }}
-        <span class="hint">{{ t("insp.ctxHint") }}</span>
+        <span v-if="ctxOpen" class="hint">{{ t("insp.ctxHint") }}</span>
       </span>
       <button
-        v-if="ctxRuns.length"
+        v-if="ctxOpen && ctxRuns.length"
         type="button"
         class="linkish"
-        @click="toggleAll()"
+        @click.stop="toggleAll()"
       >
         {{ expanded.size > 0 ? t("insp.collapseAll") : t("insp.expandAll") }}
       </button>
     </div>
-    <div class="context">
+    <div v-show="ctxOpen" class="context" :style="{ maxHeight: ctxSplit + 'px' }">
       <div v-if="!ctxRuns.length" class="empty">{{ t("insp.noSnap") }}</div>
       <template v-else>
         <div v-if="snapshot?.notes?.length" class="ctx-notes">
@@ -666,10 +688,17 @@ function rawJson(e: RuntimeEvent) {
       </template>
     </div>
 
-    <div class="subhead">
+    <div
+      v-if="ctxOpen && tlOpen"
+      class="tl-split"
+      title="拖动调整 Context / Timeline 高度"
+      @mousedown.prevent="startSplitDrag"
+    ></div>
+    <div class="subhead togglable" @click="tlOpen = !tlOpen">
       <span>
+        <span class="chev">{{ tlOpen ? "▾" : "▸" }}</span>
         {{ t("insp.timeline") }}
-        <span class="hint">
+        <span v-if="tlOpen" class="hint">
           {{
             tlMode === "live"
               ? t("insp.liveHint")
@@ -677,7 +706,7 @@ function rawJson(e: RuntimeEvent) {
           }}
         </span>
       </span>
-      <div class="tl-tools">
+      <div class="tl-tools" @click.stop>
         <button
           type="button"
           class="linkish"
@@ -734,7 +763,7 @@ function rawJson(e: RuntimeEvent) {
     </div>
     <div v-if="tlError" class="exp-error">{{ tlError }}</div>
 
-    <div class="timeline">
+    <div v-show="tlOpen" class="timeline">
       <div v-if="!timelineRows.length" class="empty">
         {{
           tlMode === "live"

@@ -570,6 +570,35 @@ button.linkish:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.subhead .chev {
+  display: inline-block;
+  width: 12px;
+  margin-right: 2px;
+  color: var(--ink);
+}
+.subhead.togglable {
+  cursor: pointer;
+  user-select: none;
+}
+.subhead.togglable:hover {
+  color: var(--accent);
+}
+.tl-split {
+  height: 6px;
+  margin: 4px 8px;
+  border-radius: 3px;
+  background: var(--line);
+  cursor: row-resize;
+  flex-shrink: 0;
+}
+.tl-split:hover {
+  background: var(--accent);
+}
+.context {
+  overflow: auto;
+  flex-shrink: 0;
+}
+
 /* Deep-link modals: permission history / file.changed detail */
 .dl-overlay {
   position: fixed;

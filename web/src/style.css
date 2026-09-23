@@ -458,6 +458,7 @@ button.linkish:hover:not(:disabled) {
   border-color: var(--tag-warn-border);
 }
 .ctx-detail-row .d-preview {
+  grid-column: 2 / -1;
   word-break: break-all;
   color: var(--muted);
   line-height: 1.35;

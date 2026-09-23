@@ -128,6 +128,11 @@ func (s *Server) handleSessionLoad(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.agent.Ctx.RestoreEntries(entries)
+	// Rebuild a snapshot so the Inspector shows the loaded session's context
+	// immediately (not the previous turn's).
+	if _, snap := s.agent.Ctx.BuildRequest(nil); snap.Step > 0 {
+		_ = snap
+	}
 
 	s.mu.Lock()
 	s.activeSessID = rec.ID

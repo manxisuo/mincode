@@ -230,7 +230,9 @@ export function useInspector() {
 
   function applySession(s: SessionInfo) {
     session.value = s;
-    if (s.snapshot) snapshot.value = s.snapshot;
+    // Always replace snapshot (including null) so a session switch
+    // cannot leave the previous turn's context on screen.
+    snapshot.value = s.snapshot ?? null;
     // Only sync chat text when idle; mid-run finals are stale by design.
     if (!s.running && s.turn?.final) {
       appendAssistantOnce(s.turn.final, s.turn.id);
@@ -432,6 +434,8 @@ export function useInspector() {
     lastFinalTurnId = -1;
     const data = await apiSessionLoad(id);
     messages.value = [];
+    events.value = [];
+    snapshot.value = null;
     for (const m of data.messages || []) {
       const role = (m.role === "user" || m.role === "assistant" || m.role === "system")
         ? m.role

@@ -436,6 +436,7 @@ export function useInspector() {
     messages.value = [];
     events.value = [];
     snapshot.value = null;
+    metrics.value = {};
     for (const m of data.messages || []) {
       const role = (m.role === "user" || m.role === "assistant" || m.role === "system")
         ? m.role

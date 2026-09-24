@@ -71,6 +71,11 @@ func (c *MetricsCollector) Handle(e Event) {
 	}
 }
 
+// Reset clears accumulated metrics (used when switching sessions).
+func (c *MetricsCollector) Reset() {
+	c.m = Metrics{}
+}
+
 // Snapshot returns a copy of current metrics.
 func (c *MetricsCollector) Snapshot() Metrics {
 	return c.m

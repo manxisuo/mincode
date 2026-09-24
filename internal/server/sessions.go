@@ -133,6 +133,9 @@ func (s *Server) handleSessionLoad(w http.ResponseWriter, r *http.Request) {
 	if _, snap := s.agent.Ctx.BuildRequest(nil); snap.Step > 0 {
 		_ = snap
 	}
+	if s.metrics != nil {
+		s.metrics.Reset()
+	}
 
 	s.mu.Lock()
 	s.activeSessID = rec.ID

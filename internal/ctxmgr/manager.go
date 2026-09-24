@@ -39,7 +39,49 @@ type Manager struct {
 	step         int
 	lastSnapshot *Snapshot
 	prevSnapshot *Snapshot
+	// snapHist keeps recent snapshots by step for historical replay (T-obs-5).
+	snapHist []*Snapshot
 	cal          *Calibrator
+}
+
+// maxSnapHist bounds historical snapshots kept for replay.
+const maxSnapHist = 40
+
+// SnapshotByStep returns a stored snapshot for historical replay, or nil.
+func (m *Manager) SnapshotByStep(step int) *Snapshot {
+	if m == nil {
+		return nil
+	}
+	for _, s := range m.snapHist {
+		if s != nil && s.Step == step {
+			return s
+		}
+	}
+	return nil
+}
+
+// SnapHistory lists stored snapshot steps (ascending).
+func (m *Manager) SnapHistory() []int {
+	if m == nil {
+		return nil
+	}
+	out := make([]int, 0, len(m.snapHist))
+	for _, s := range m.snapHist {
+		if s != nil {
+			out = append(out, s.Step)
+		}
+	}
+	return out
+}
+
+func (m *Manager) pushSnapHist(s *Snapshot) {
+	if s == nil {
+		return
+	}
+	m.snapHist = append(m.snapHist, s)
+	if len(m.snapHist) > maxSnapHist {
+		m.snapHist = m.snapHist[len(m.snapHist)-maxSnapHist:]
+	}
 }
 
 // New creates a context manager.
@@ -522,6 +564,7 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 	snap.Notes = notes
 	snap.Diff = DiffSnapshots(m.lastSnapshot, &snap)
 	m.lastSnapshot = &snap
+	m.pushSnapHist(&snap)
 
 	return llm.ChatRequest{Messages: messages, Tools: tools}, snap
 }

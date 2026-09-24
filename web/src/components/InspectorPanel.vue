@@ -22,6 +22,7 @@ const emit = defineEmits<{
     data?: Record<string, unknown>,
     sourceEvents?: RuntimeEvent[],
   ];
+  replay: [e: RuntimeEvent, sourceEvents?: RuntimeEvent[]];
 }>();
 
 function isDeeplink(e: RuntimeEvent): boolean {
@@ -78,6 +79,11 @@ function onTimelineClick(e: RuntimeEvent) {
     __row_key: rowKey,
   } as Record<string, unknown>;
   emit("deeplink", e.type, payload, displayEvents.value);
+}
+
+/** T-obs-5: pin Inspector to the historical state at this event. */
+function onReplayHere(e: RuntimeEvent) {
+  emit("replay", e, displayEvents.value);
 }
 
 type ItemRow = {
@@ -846,6 +852,11 @@ function rawJson(e: RuntimeEvent) {
                 }}
               </span>
               <span v-if="previewData(row.e.data)" class="d">{{ previewData(row.e.data) }}</span>
+              <span
+                class="tl-goto"
+                title="回到此处（历史状态）"
+                @click.stop="onReplayHere(row.e)"
+              >⏱</span>
               <span v-if="isDeeplink(row.e)" class="tl-goto">↗</span>
             </template>
           </div>

@@ -355,11 +355,31 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleContext(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleContext(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	res := s.lastResult
 	s.mu.Unlock()
 	var snap *ctxmgr.Snapshot
+	// T-obs-5: ?step=N returns the historical snapshot for replay.
+	if q := r.URL.Query().Get("step"); q != "" {
+		step := 0
+		for _, c := range q {
+			if c < '0' || c > '9' {
+				writeErr(w, http.StatusBadRequest, "invalid step")
+				return
+			}
+			step = step*10 + int(c-'0')
+		}
+		if s.agent != nil && s.agent.Ctx != nil {
+			snap = s.agent.Ctx.SnapshotByStep(step)
+		}
+		if snap == nil {
+			writeErr(w, http.StatusNotFound, "no snapshot for step")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"snapshot": snap, "replay": true, "step": step})
+		return
+	}
 	if res != nil && res.Snapshot != nil {
 		snap = res.Snapshot
 	} else if s.agent != nil && s.agent.Ctx != nil {
@@ -369,7 +389,23 @@ func (s *Server) handleContext(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "total_tokens": 0})
 		return
 	}
-	writeJSON(w, http.StatusOK, snap)
+	steps := []int{}
+	if s.agent != nil && s.agent.Ctx != nil {
+		steps = s.agent.Ctx.SnapHistory()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items":          snap.Items,
+		"step":           snap.Step,
+		"total_tokens":   snap.TotalTokens,
+		"tool_tokens":    snap.ToolTokens,
+		"budget":         snap.Budget,
+		"included_count": snap.Included,
+		"excluded_count": snap.Excluded,
+		"truncated_count": snap.Truncated,
+		"notes":          snap.Notes,
+		"diff":           snap.Diff,
+		"history_steps":  steps,
+	})
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {

@@ -117,6 +117,16 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	registry.Register(&tools.EditFile{WS: ws})
 	registry.Register(&tools.Shell{WS: ws})
 
+	if searchProvider, err := buildWebSearch(cfg); err != nil {
+		return err
+	} else if searchProvider != nil {
+		registry.Register(&tools.WebSearch{
+			Provider:   searchProvider,
+			MaxResults: cfg.WebSearch.MaxResults,
+			Timeout:    time.Duration(cfg.WebSearch.TimeoutSec) * time.Second,
+		})
+	}
+
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
 	ag := agent.NewWithCompress(provider, registry, bus, sessionID, cfg.Agent.MaxSteps,
 		sysPrompt, cfg.Agent.TokenBudget, cfg.Agent.CompressAt)
@@ -169,12 +179,12 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	}
 
 	srv := server.New(server.Options{
-		Addr:      addr,
-		Workspace: workspace,
-		SessionID: sessionID,
-		Provider:  provider.Name(),
-		Model:     provider.Model(),
-		TraceDir:  traceDir,
+		Addr:       addr,
+		Workspace:  workspace,
+		SessionID:  sessionID,
+		Provider:   provider.Name(),
+		Model:      provider.Model(),
+		TraceDir:   traceDir,
 		Resolution: resolution,
 	}, ag, bus, metrics, expStore, skillLoader, ws, instrLoader)
 	ag.Approver = srv.WebApprover()

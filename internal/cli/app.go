@@ -31,6 +31,7 @@ import (
 	"github.com/manxisuo/mincode/internal/session"
 	"github.com/manxisuo/mincode/internal/skill"
 	"github.com/manxisuo/mincode/internal/tools"
+	"github.com/manxisuo/mincode/internal/websearch"
 )
 
 // Options are runtime options from flags.
@@ -144,6 +145,17 @@ func NewApp(opts Options) (*App, error) {
 	registry.Register(&tools.EditFile{WS: ws})
 	registry.Register(&tools.Shell{WS: ws})
 
+	if searchProvider, err := buildWebSearch(cfg); err != nil {
+		_ = recorder.Close()
+		return nil, err
+	} else if searchProvider != nil {
+		registry.Register(&tools.WebSearch{
+			Provider:   searchProvider,
+			MaxResults: cfg.WebSearch.MaxResults,
+			Timeout:    time.Duration(cfg.WebSearch.TimeoutSec) * time.Second,
+		})
+	}
+
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
 	ag := agent.NewWithCompress(provider, registry, bus, sessionID, cfg.Agent.MaxSteps, sysPrompt, cfg.Agent.TokenBudget, cfg.Agent.CompressAt)
 	if cfg.Agent.ParallelTools != nil {
@@ -251,6 +263,22 @@ func buildProvider(cfg config.Config) (llm.Provider, error) {
 		), nil
 	default:
 		return nil, fmt.Errorf("unknown provider type %q", cfg.Provider.Type)
+	}
+}
+
+// buildWebSearch builds the web search backend from config, or nil when disabled.
+func buildWebSearch(cfg config.Config) (websearch.Provider, error) {
+	switch cfg.WebSearch.Type {
+	case "":
+		return nil, nil
+	case "fake":
+		return websearch.NewFakeProvider(websearch.SearchResponse{
+			Results: []websearch.Result{
+				{Title: "Fake web result", URL: "https://example.com/fake", Snippet: "Offline fake web search result."},
+			},
+		}), nil
+	default:
+		return nil, fmt.Errorf("unknown websearch type %q", cfg.WebSearch.Type)
 	}
 }
 

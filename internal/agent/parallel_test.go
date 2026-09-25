@@ -20,6 +20,19 @@ func writeTestFile(ws *tools.Workspace, rel, content string) error {
 	return os.WriteFile(filepath.Join(ws.Root(), rel), []byte(content), 0o644)
 }
 
+func TestParallelSafeIncludesWebSearch(t *testing.T) {
+	for _, name := range []string{"read_file", "list_dir", "glob", "grep", "web_search"} {
+		if !isParallelSafe(name) {
+			t.Fatalf("%s should be parallel-safe", name)
+		}
+	}
+	for _, name := range []string{"write_file", "edit_file", "shell", "memory_add", "unknown_tool"} {
+		if isParallelSafe(name) {
+			t.Fatalf("%s must not be parallel-safe", name)
+		}
+	}
+}
+
 // blockingReadTool is a parallel-safe fake that records concurrency.
 type blockingReadTool struct {
 	inflight *atomic.Int32

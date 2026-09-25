@@ -55,6 +55,7 @@ func Resolve(path, workspace string, envGet func(string) string, cli map[string]
 		{"agent.max_steps", nil, func() string { return itoa(base.Agent.MaxSteps) }, func() string { return "30" }, false},
 		{"agent.token_budget", nil, func() string { return itoa(base.Agent.TokenBudget) }, func() string { return "32000" }, false},
 		{"agent.compress_at", nil, func() string { return itoa(base.Agent.CompressAt) }, func() string { return "18000" }, false},
+		{"websearch.type", []string{"MINCODE_WEBSEARCH_TYPE"}, func() string { return base.WebSearch.Type }, func() string { return "" }, false},
 		{"data.location", []string{"MINCODE_DATA_LOCATION"}, func() string { return base.Data.Location }, func() string { return "global" }, false},
 	}
 

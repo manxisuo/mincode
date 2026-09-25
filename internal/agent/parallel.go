@@ -19,10 +19,11 @@ const defaultMaxParallel = 4
 // parallelSafeTools are read-only tools with no side effects; they can run
 // concurrently when the model returns several of them in one response.
 var parallelSafeTools = map[string]bool{
-	"read_file": true,
-	"list_dir":  true,
-	"glob":      true,
-	"grep":      true,
+	"read_file":  true,
+	"list_dir":   true,
+	"glob":       true,
+	"grep":       true,
+	"web_search": true,
 }
 
 func isParallelSafe(name string) bool { return parallelSafeTools[name] }

@@ -16,6 +16,9 @@ func TestDefaultPolicy(t *testing.T) {
 	if p.Evaluate(Request{Tool: "rm_rf"}) != Deny {
 		t.Fatal("unknown should deny")
 	}
+	if p.Evaluate(Request{Tool: "web_search"}) != Allow {
+		t.Fatal("web_search should allow (read-only, backend must be configured)")
+	}
 }
 
 func TestEvaluateAllowDenyAsk(t *testing.T) {

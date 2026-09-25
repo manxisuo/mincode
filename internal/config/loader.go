@@ -80,6 +80,9 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("MINCODE_DATA_ROOT"); v != "" {
 		cfg.Data.Root = v
 	}
+	if v := os.Getenv("MINCODE_WEBSEARCH_TYPE"); v != "" {
+		cfg.WebSearch.Type = v
+	}
 }
 
 func firstEnv(keys ...string) string {

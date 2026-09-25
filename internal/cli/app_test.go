@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/manxisuo/mincode/internal/config"
 	"github.com/manxisuo/mincode/internal/llm"
 	"github.com/manxisuo/mincode/internal/observability"
 )
@@ -224,5 +225,53 @@ func TestInstructionsLoadedAtStartup(t *testing.T) {
 	app.handleCommand(context.Background(), "/timeline")
 	if !strings.Contains(buf.String(), "Instructions") {
 		t.Fatalf("timeline missing instructions: %q", buf.String())
+	}
+}
+
+func TestBuildWebSearch(t *testing.T) {
+	if p, err := buildWebSearch(config.Config{}); err != nil || p != nil {
+		t.Fatalf("disabled: provider=%v err=%v", p, err)
+	}
+	p, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "fake"}})
+	if err != nil || p == nil {
+		t.Fatalf("fake: provider=%v err=%v", p, err)
+	}
+	if p.Name() != "fake" {
+		t.Fatalf("name = %q", p.Name())
+	}
+	if _, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "bogus"}}); err == nil {
+		t.Fatal("unknown type should error")
+	}
+}
+
+func TestWebSearchToolRegisteredWhenConfigured(t *testing.T) {
+	wsDir := t.TempDir()
+	cfgPath := filepath.Join(t.TempDir(), "mincode.yaml")
+	yaml := "provider:\n  type: fake\nmodel: fake-model\nwebsearch:\n  type: fake\nmax_results: 3\n"
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	app, err := NewApp(Options{ConfigPath: cfgPath, Workspace: wsDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = app.Close() })
+
+	if _, ok := app.agent.Tools.Get("web_search"); !ok {
+		t.Fatal("web_search should be registered when configured")
+	}
+
+	// Without websearch config the tool must not be offered to the model.
+	cfgPath2 := filepath.Join(t.TempDir(), "mincode.yaml")
+	if err := os.WriteFile(cfgPath2, []byte("provider:\n  type: fake\nmodel: fake-model\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	app2, err := NewApp(Options{ConfigPath: cfgPath2, Workspace: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = app2.Close() })
+	if _, ok := app2.agent.Tools.Get("web_search"); ok {
+		t.Fatal("web_search must not be registered when disabled")
 	}
 }

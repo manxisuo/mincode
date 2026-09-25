@@ -58,6 +58,7 @@ func NewDefaultPolicy() *DefaultPolicy {
 			"list_dir":   Allow,
 			"glob":       Allow,
 			"grep":       Allow,
+			"web_search": Allow, // read-only network query; backend must be configured
 			"write_file": Ask,
 			"edit_file":  Ask,
 			"shell":      Ask, // Phase 5; reserved

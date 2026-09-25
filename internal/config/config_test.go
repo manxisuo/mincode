@@ -121,3 +121,46 @@ func TestTracePath(t *testing.T) {
 		t.Fatalf("path = %q", p)
 	}
 }
+
+func TestWebSearchConfigYAML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	content := "provider:\n  type: fake\nwebsearch:\n  type: fake\n  max_results: 3\n  timeout_sec: 15\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.WebSearch.Type != "fake" {
+		t.Fatalf("type = %q", cfg.WebSearch.Type)
+	}
+	if cfg.WebSearch.MaxResults != 3 || cfg.WebSearch.TimeoutSec != 15 {
+		t.Fatalf("websearch = %+v", cfg.WebSearch)
+	}
+	if !cfg.WebSearch.Enabled() {
+		t.Fatal("expected Enabled")
+	}
+}
+
+func TestWebSearchDisabledByDefault(t *testing.T) {
+	cfg := Default()
+	if cfg.WebSearch.Enabled() {
+		t.Fatalf("websearch should be disabled by default: %+v", cfg.WebSearch)
+	}
+}
+
+func TestWebSearchEnvOverride(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	if err := os.WriteFile(path, []byte("provider:\n  type: fake\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MINCODE_WEBSEARCH_TYPE", "fake")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.WebSearch.Type != "fake" {
+		t.Fatalf("env should override type, got %q", cfg.WebSearch.Type)
+	}
+}

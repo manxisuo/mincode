@@ -1302,6 +1302,7 @@ func (a *App) approveAndRunPlan(ctx context.Context) {
 	planStepBudget := a.agent.MaxSteps
 
 	var stepNotes []string
+	var lastFullResult string
 
 	for i := range p.Steps {
 		if err := ctx.Err(); err != nil {
@@ -1388,6 +1389,7 @@ func (a *App) approveAndRunPlan(ctx context.Context) {
 			fmt.Fprintln(a.out)
 		}
 		fmt.Fprintf(a.out, "%s step %d done\n\n", green("✓"), step.Index)
+		lastFullResult = full
 	}
 
 	p.Finish()
@@ -1403,6 +1405,10 @@ func (a *App) approveAndRunPlan(ctx context.Context) {
 	fmt.Fprint(a.out, p.Format())
 	if p.Status == plan.StatusDone {
 		fmt.Fprintf(a.out, "\n%s plan %s complete\n", green("ok"), bold(p.ID))
+		if lastFullResult != "" {
+			fmt.Fprintln(a.out)
+			fmt.Fprintln(a.out, lastFullResult)
+		}
 	}
 	fmt.Fprintln(a.out)
 }
@@ -1527,6 +1533,7 @@ func (a *App) autoPlanAndRun(ctx context.Context, p *plan.Plan) {
 
 	planStepBudget := a.agent.MaxSteps
 	var stepNotes []string
+	var lastFullResult string
 
 	for i := 0; i < len(p.Steps); {
 		if err := ctx.Err(); err != nil {
@@ -1671,6 +1678,7 @@ func (a *App) autoPlanAndRun(ctx context.Context, p *plan.Plan) {
 			fmt.Fprintln(a.out)
 		}
 		fmt.Fprintf(a.out, "%s step %d done\n\n", green("✓"), step.Index)
+		lastFullResult = full
 		i++
 	}
 
@@ -1692,6 +1700,11 @@ func (a *App) autoPlanAndRun(ctx context.Context, p *plan.Plan) {
 			extra = fmt.Sprintf(" (replanned %d time(s))", p.ReplanCount)
 		}
 		fmt.Fprintf(a.out, "\n%s plan %s complete%s\n", green("ok"), bold(p.ID), extra)
+		// Print the last step's full result so the user sees the final answer.
+		if lastFullResult != "" {
+			fmt.Fprintln(a.out)
+			fmt.Fprintln(a.out, lastFullResult)
+		}
 	}
 	fmt.Fprintln(a.out)
 }

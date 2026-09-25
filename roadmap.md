@@ -1,7 +1,7 @@
 # Roadmap
 
 > **状态：Phase 0–12 已全部完成**（含 Hardening 修复、MVP 验收测试、Experiment 分布统计）。
-> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式** 已落地；**透明性深化（Wire View / Context Diff / Provenance 等）** 见文末与 `observability.md` §19–21。
+> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）** 均已落地。
 
 ## 总体原则
 
@@ -420,14 +420,14 @@ Adaptive Tool Selection
 Plan-and-Execute
 Local Web Inspector     ✅ W1 已实现（HTTP/SSE + web/）
 LLM Streaming Output    ✅ 已实现（SSE 增量 + TTFT + CLI/Web 展示）
-Transparency Deepening  ⏳ 规划中（Wire Request / Context Diff / Provenance / Decision Trace / Historical Replay）
+Transparency Deepening  ✅ 已实现（T-obs-1~7）
 ```
 
 任何新增能力都必须同步设计对应可观测能力。
 
 ---
 
-## Transparency Deepening（透明性深化 · 规划中）
+## Transparency Deepening（透明性深化 · 已实现）
 
 设计原则见 `README.md` 设计原则 §2 与 `AGENTS.md` §8：  
 **优先解释 Runtime 显式决策与数据血缘；对 LLM 只展示 action rationale，禁止把推测推理当事实。**
@@ -445,13 +445,13 @@ Transparency Deepening  ⏳ 规划中（Wire Request / Context Diff / Provenance
 
 | 序 | 子项 | 层级 | 说明 |
 |---|---|---|---|
-| T-obs-1 | **Wire Request View** | L2→L3 | 真正发给 Provider 的 messages/tools；estimated vs `prompt_tokens` 与 delta |
-| T-obs-2 | **Context Diff + 排除/压缩原因** | L3 | 快照间 ±；policy/reason/节省 tokens |
-| T-obs-3 | **Provenance / 数据血缘** | L4 | item ← tool.call_id ← 路径/行 ← step；transform |
-| T-obs-4 | **Runtime Decision Trace** | L3 | permission 策略链、并行原因、loop detection |
-| T-obs-5 | **Historical Snapshot Replay** | L5 | Step N 的完整 Runtime 状态回放 |
-| T-obs-6 | Tool 全文结果 / 失败详情 | L2 | 按 call_id 显式拉取完整输出 |
-| T-obs-7 | Config Resolution Inspector | L3 | Default → Global → Project → Env → CLI 覆盖链 |
+| T-obs-1 | **Wire Request View** ✅ | L2→L3 | 真正发给 Provider 的 messages/tools；estimated vs `prompt_tokens` 与 delta |
+| T-obs-2 | **Context Diff + 排除/压缩原因** ✅ | L3 | 快照间 ±；policy/reason/节省 tokens |
+| T-obs-3 | **Provenance / 数据血缘** ✅ | L4 | item ← tool.call_id ← 路径/行 ← step；transform |
+| T-obs-4 | **Runtime Decision Trace** ✅ | L3 | permission 策略链、并行原因、loop detection |
+| T-obs-5 | **Historical Snapshot Replay** ✅ | L5 | Step N 的完整 Runtime 状态回放 |
+| T-obs-6 | Tool 全文结果 / 失败详情 ✅ | L2 | 按 call_id 显式拉取完整输出 |
+| T-obs-7 | Config Resolution Inspector ✅ | L3 | Default → Global → Project → Env → CLI 覆盖链 |
 
 ### 明确不做（本系列）
 

@@ -21,6 +21,7 @@ const (
 	SourceUserInput    Source = "user_input"
 	SourcePinned       Source = "pinned"
 	SourceSummary      Source = "summary"
+	SourceReflection   Source = "reflection"
 )
 
 // Provenance is T-obs-4 data lineage for one context item (L4).

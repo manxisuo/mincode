@@ -89,6 +89,15 @@ agent:
   # 并行只读工具的并发上限。默认: 4
   max_parallel: 4
 
+  # 自省（Reflection）：最终回答前让模型自审一次，发现问题则继续迭代。
+  # 开启后每个完成的回合会多一次 LLM 调用。
+  # 事件: reflection.started / reflection.finished（含 verdict/issue_count）。
+  # 默认: false
+  reflection: false
+
+  # 单回合最多自省次数（达到上限后接受当前回答，避免死循环）。默认: 2
+  max_reflections: 2
+
   # 自定义 System Prompt。留空则使用内置 DefaultSystemPrompt
   #（并会附加平台相关 shell 提示：Windows/cmd vs Unix/sh）。
   # 填写后将**完全替换**内置提示词，需要时请自行写全工具与安全说明。

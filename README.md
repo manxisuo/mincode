@@ -75,7 +75,7 @@ CLI REPL / 单次执行 / --continue / replay
 
 OpenAI-compatible + Fake Provider（含 ChatStream 流式）
 
-Agent Loop（状态机、loop detection、取消）
+Agent Loop（状态机、loop detection、取消、可选自省 Reflection）
 
 Tools:
   read_file / list_dir / glob / grep

@@ -315,3 +315,28 @@ func TestSnapshotSummary(t *testing.T) {
 		t.Fatalf("summary = %s", s)
 	}
 }
+
+func TestAppendReflectionSource(t *testing.T) {
+	m := New("SYS", "", 10000)
+	m.AppendUser("do the task")
+	m.AppendAssistant(llm.Message{Role: llm.RoleAssistant, Content: "v1"})
+	m.AppendReflection("[self-reflection] fix x")
+
+	// Round-trips through export with its own source.
+	entries := m.ExportEntries()
+	if len(entries) != 3 || entries[2].Source != string(SourceReflection) {
+		t.Fatalf("entries = %+v", entries)
+	}
+
+	// In the next build the reflection item keeps SourceReflection (not user_input).
+	_, snap := m.BuildRequest(nil)
+	found := false
+	for _, it := range snap.Items {
+		if it.Source == SourceReflection {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("reflection source missing from snapshot items: %+v", snap.Items)
+	}
+}

@@ -198,6 +198,15 @@ func (m *Manager) AppendAssistant(msg llm.Message) {
 	})
 }
 
+// AppendReflection records a self-critique message (user role, own source).
+func (m *Manager) AppendReflection(text string) {
+	m.entries = append(m.entries, entry{
+		msg:    llm.Message{Role: llm.RoleUser, Content: text},
+		source: SourceReflection,
+		tokens: m.est(text),
+	})
+}
+
 // AppendToolResult records a tool observation tied to a tool_call_id.
 // Oversized results are truncated up-front so they cannot flood later turns.
 func (m *Manager) AppendToolResult(toolCallID, content string) {
@@ -348,15 +357,18 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 	}
 	for i, e := range m.entries {
 		src := e.source
-		if e.msg.Role == llm.RoleTool {
+		switch {
+		case e.msg.Role == llm.RoleTool:
 			src = SourceToolResult
-		} else if e.msg.Role == llm.RoleUser {
+		case e.msg.Role == llm.RoleUser && e.source == SourceReflection:
+			src = SourceReflection
+		case e.msg.Role == llm.RoleUser:
 			if i == len(m.entries)-1 {
 				src = SourceUserInput
 			} else {
 				src = SourceHistory
 			}
-		} else {
+		default:
 			src = SourceHistory
 		}
 		parts = append(parts, part{

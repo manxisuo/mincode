@@ -137,6 +137,10 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	}
 	ag.MaxParallel = cfg.Agent.MaxParallel
 	ag.Stream = cfg.StreamEnabled()
+	if cfg.Agent.Reflection != nil {
+		ag.Reflection = *cfg.Agent.Reflection
+	}
+	ag.MaxReflections = cfg.Agent.MaxReflections
 	// Approver set after server.New so pending requests can reach the web UI.
 
 	registry.Register(&tools.MemoryAdd{

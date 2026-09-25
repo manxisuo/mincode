@@ -165,6 +165,10 @@ func NewApp(opts Options) (*App, error) {
 	}
 	ag.MaxParallel = cfg.Agent.MaxParallel
 	ag.Stream = cfg.StreamEnabled()
+	if cfg.Agent.Reflection != nil {
+		ag.Reflection = *cfg.Agent.Reflection
+	}
+	ag.MaxReflections = cfg.Agent.MaxReflections
 
 	instrLoader, err := instruction.NewLoader(workspace)
 	if err != nil {

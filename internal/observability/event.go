@@ -67,6 +67,10 @@ const (
 
 	EventLoopDetected EventType = "loop.detected"
 	EventDecision     EventType = "decision.recorded"
+
+	// Reflection is the agent's bounded self-critique pass before finalizing.
+	EventReflectionStarted  EventType = "reflection.started"
+	EventReflectionFinished EventType = "reflection.finished"
 )
 
 // Event is a structured observation record.
@@ -342,4 +346,16 @@ type PlanEventData struct {
 	Error       string `json:"error,omitempty"`
 	Reason      string `json:"reason,omitempty"`
 	ReplanCount int    `json:"replan_count,omitempty"`
+}
+
+// ReflectionData is payload for reflection.* events (agent self-critique).
+type ReflectionData struct {
+	Step            int    `json:"step,omitempty"`
+	Reflection      int    `json:"reflection,omitempty"`
+	MaxReflections  int    `json:"max_reflections,omitempty"`
+	Verdict         string `json:"verdict,omitempty"` // done | continue | error
+	IssueCount      int    `json:"issue_count,omitempty"`
+	CritiquePreview string `json:"critique_preview,omitempty"`
+	DurationMS      int64  `json:"duration_ms,omitempty"`
+	Error           string `json:"error,omitempty"`
 }

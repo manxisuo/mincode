@@ -1,7 +1,7 @@
 # Roadmap
 
 > **状态：Phase 0–12 已全部完成**（含 Hardening 修复、MVP 验收测试、Experiment 分布统计）。
-> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch** 均已落地。
+> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection** 均已落地。
 
 ## 总体原则
 
@@ -412,7 +412,7 @@ Repository Map
 Semantic Code Search
 RAG
 Context Caching
-Reflection
+Reflection             ✅ 已实现（有界自省 + reflection.* 事件）
 Sub-Agent
 MCP
 Long-term Memory
@@ -633,6 +633,50 @@ websearch:
 
 ```text
 浏览器渲染（不执行 JS；纯 JS 渲染的页面可能取不到正文）
+```
+
+---
+
+## Reflection（自省 · 已实现）
+
+### 目标
+
+让 Agent 在最终回答前自审一次，发现遗漏 / 错误则继续迭代，提升结果可靠性。
+
+### 实现
+
+```text
+Agent.Run 在「无 tool_calls」准备收尾时触发：
+  发一条 user 指令要求自审，模型须回答
+    VERDICT: DONE            → 接受当前回答
+    VERDICT: CONTINUE + 问题  → 追加 [self-reflection] 消息并继续循环
+```
+
+- 有界：`agent.reflection`（默认 false）+ `agent.max_reflections`（默认 2），且受 `max_steps` 约束
+- 自审调用不流式；失败按 best-effort 处理（接受当前回答，不中断回合）
+- 默认关闭：开启后每个完成回合多一次 LLM 调用
+
+### 可观测
+
+```text
+reflection.started / reflection.finished（verdict / issue_count / critique_preview / duration_ms）
+decision.recorded（domain=reflection, action=continue|done）
+Context: 自省消息来源标记为 reflection（区别于 user_input）
+```
+
+### 配置
+
+```yaml
+agent:
+  reflection: true
+  max_reflections: 2
+```
+
+### 明确不做
+
+```text
+长期 / 跨会话的反思记忆（属 Memory）
+让模型输出隐藏思维链
 ```
 
 ---

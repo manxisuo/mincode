@@ -52,6 +52,11 @@ type AgentConfig struct {
 	ParallelTools *bool `yaml:"parallel_tools"`
 	// MaxParallel caps concurrent read-only tools (0 = default 4).
 	MaxParallel int `yaml:"max_parallel"`
+	// Reflection enables a self-critique pass before the agent finalizes an
+	// answer. Off by default (adds one LLM call per completed turn).
+	Reflection *bool `yaml:"reflection"`
+	// MaxReflections caps self-critique retries per turn (0 = default 2).
+	MaxReflections int `yaml:"max_reflections"`
 }
 
 // MemoryConfig controls cross-session MEMORY.md behavior.
@@ -75,6 +80,7 @@ type DataConfig struct {
 // Default returns a sensible default configuration.
 func Default() Config {
 	on := true
+	off := false
 	return Config{
 		Provider: ProviderConfig{
 			Type:        "openai-compatible",
@@ -85,12 +91,14 @@ func Default() Config {
 			Stream:      &on,
 		},
 		Agent: AgentConfig{
-			MaxSteps:      30,
-			SystemPrompt:  DefaultSystemPrompt,
-			TokenBudget:   32000,
-			CompressAt:    18000,
-			ParallelTools: &on,
-			MaxParallel:   4,
+			MaxSteps:       30,
+			SystemPrompt:   DefaultSystemPrompt,
+			TokenBudget:    32000,
+			CompressAt:     18000,
+			ParallelTools:  &on,
+			MaxParallel:    4,
+			Reflection:     &off,
+			MaxReflections: 2,
 		},
 		Data: DataConfig{
 			Location: "global",

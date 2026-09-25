@@ -164,3 +164,30 @@ func TestWebSearchEnvOverride(t *testing.T) {
 		t.Fatalf("env should override type, got %q", cfg.WebSearch.Type)
 	}
 }
+
+func TestReflectionConfig(t *testing.T) {
+	// Default: off, max reflections normalized to 2.
+	def := Default()
+	if def.Agent.Reflection == nil || *def.Agent.Reflection {
+		t.Fatal("reflection should default off")
+	}
+	if def.Agent.MaxReflections != 2 {
+		t.Fatalf("default max_reflections = %d, want 2", def.Agent.MaxReflections)
+	}
+
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	content := "provider:\n  type: fake\nagent:\n  reflection: true\n  max_reflections: 3\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Agent.Reflection == nil || !*cfg.Agent.Reflection {
+		t.Fatal("reflection should be enabled from yaml")
+	}
+	if cfg.Agent.MaxReflections != 3 {
+		t.Fatalf("max_reflections = %d, want 3", cfg.Agent.MaxReflections)
+	}
+}

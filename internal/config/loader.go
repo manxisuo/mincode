@@ -137,6 +137,13 @@ func normalize(cfg *Config) {
 	if cfg.Agent.MaxParallel <= 0 {
 		cfg.Agent.MaxParallel = 4
 	}
+	if cfg.Agent.Reflection == nil {
+		off := false
+		cfg.Agent.Reflection = &off
+	}
+	if cfg.Agent.MaxReflections <= 0 {
+		cfg.Agent.MaxReflections = 2
+	}
 	if cfg.Data.Location == "" {
 		cfg.Data.Location = "global"
 	}

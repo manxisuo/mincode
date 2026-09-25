@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -24,10 +25,20 @@ var MaxStepsExceeded = errors.New("agent: max steps exceeded")
 var LoopDetected = errors.New("agent: tool call loop detected")
 
 const (
-	defaultMaxSteps = 30
-	maxLoopRepeats  = 5
-	toolPreviewLen  = 200
+	defaultMaxSteps       = 30
+	maxLoopRepeats        = 5
+	toolPreviewLen        = 200
+	defaultMaxReflections = 2
 )
+
+// reflectionInstruction is appended as a user message for a self-critique pass.
+const reflectionInstruction = `Review your work above for the user's task.
+Check: did you fully address it? Any factual errors, missing steps, or unverified claims?
+If you changed code, was it validated (e.g., tests run)?
+Reply with EXACTLY one of:
+- "VERDICT: DONE"
+- "VERDICT: CONTINUE" followed by a numbered list of concrete issues to fix.
+No other prose.`
 
 // truncatePreview cuts s to at most max bytes on a UTF-8 rune boundary.
 func truncatePreview(s string, max int) string {
@@ -63,6 +74,11 @@ type Agent struct {
 	Stream bool
 	// lastTTFT is TTFT of the most recent streamed chat call.
 	lastTTFT time.Duration
+
+	// Reflection enables a bounded self-critique pass before finalizing.
+	Reflection bool
+	// MaxReflections caps self-critique retries per turn (default 2).
+	MaxReflections int
 
 	// lastWire is the most recent provider-bound request (T-obs-1 wire view).
 	lastWireMu sync.Mutex
@@ -115,17 +131,18 @@ func NewWithCompress(provider llm.Provider, reg *tools.Registry, bus *observabil
 	mgr := ctxmgr.New(systemPrompt, "", tokenBudget)
 	mgr.SetCompressAt(compressAt)
 	return &Agent{
-		Provider:      provider,
-		Tools:         reg,
-		Bus:           bus,
-		SessionID:     sessionID,
-		MaxSteps:      maxSteps,
-		Policy:        &permission.ShellAwarePolicy{Inner: permission.NewDefaultPolicy()},
-		ParallelTools: true,
-		MaxParallel:   defaultMaxParallel,
-		Stream:        true,
-		Ctx:           mgr,
-		State:         StateIdle,
+		Provider:       provider,
+		Tools:          reg,
+		Bus:            bus,
+		SessionID:      sessionID,
+		MaxSteps:       maxSteps,
+		Policy:         &permission.ShellAwarePolicy{Inner: permission.NewDefaultPolicy()},
+		ParallelTools:  true,
+		MaxParallel:    defaultMaxParallel,
+		Stream:         true,
+		MaxReflections: defaultMaxReflections,
+		Ctx:            mgr,
+		State:          StateIdle,
 	}
 }
 
@@ -169,11 +186,12 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 	a.Ctx.AppendUser(userInput)
 
 	var (
-		steps      int
-		toolCalls  int
-		toolErrors int
-		lastKey    string
-		repeats    int
+		steps       int
+		toolCalls   int
+		toolErrors  int
+		reflections int
+		lastKey     string
+		repeats     int
 	)
 
 	for step := 0; step < a.MaxSteps; step++ {
@@ -254,6 +272,31 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 				Role:    llm.RoleAssistant,
 				Content: resp.Content,
 			})
+
+			// Bounded self-critique before finalizing.
+			if a.Reflection && reflections < a.maxReflections() {
+				reflections++
+				keepGoing, critique, rerr := a.reflect(ctx, req, resp.Content, reflections)
+				switch {
+				case rerr != nil:
+					if errors.Is(rerr, context.Canceled) || errors.Is(rerr, context.DeadlineExceeded) {
+						a.setState(StateCancelled)
+						a.Ctx.DropLastUser()
+						return nil, rerr
+					}
+					// Reflection is best-effort: accept the answer on failure.
+				case keepGoing:
+					a.Ctx.AppendReflection(critique)
+					a.emitDecision("reflection", "continue", "answer", "self_critique",
+						fmt.Sprintf("review found issues (attempt %d/%d)", reflections, a.maxReflections()),
+						[]string{fmt.Sprintf("issue_count=%d", countIssues(critique))})
+					continue
+				default:
+					a.emitDecision("reflection", "done", "answer", "self_critique",
+						"review found no blocking issues", nil)
+				}
+			}
+
 			a.setState(StateFinished)
 			return &Result{
 				Final:      resp.Content,
@@ -816,4 +859,88 @@ func (a *Agent) emitLLMFailed(elapsed time.Duration, err error) {
 		DurationMS: elapsed.Milliseconds(),
 		Error:      err.Error(),
 	})
+}
+
+func (a *Agent) maxReflections() int {
+	if a.MaxReflections <= 0 {
+		return defaultMaxReflections
+	}
+	return a.MaxReflections
+}
+
+// reflect runs one bounded self-critique pass over the produced final answer.
+// keepGoing is true when the critique asks for another iteration.
+func (a *Agent) reflect(ctx context.Context, req llm.ChatRequest, final string, n int) (keepGoing bool, critique string, err error) {
+	msgs := make([]llm.Message, 0, len(req.Messages)+2)
+	msgs = append(msgs, req.Messages...)
+	msgs = append(msgs, llm.Message{Role: llm.RoleAssistant, Content: final})
+	msgs = append(msgs, llm.Message{Role: llm.RoleUser, Content: reflectionInstruction})
+
+	a.emit(observability.EventReflectionStarted, observability.ReflectionData{
+		Reflection:     n,
+		MaxReflections: a.maxReflections(),
+	})
+
+	start := time.Now()
+	resp, err := a.Provider.Chat(ctx, llm.ChatRequest{Messages: msgs})
+	elapsed := time.Since(start)
+	if err != nil {
+		a.emit(observability.EventReflectionFinished, observability.ReflectionData{
+			Reflection:     n,
+			MaxReflections: a.maxReflections(),
+			Verdict:        "error",
+			DurationMS:     elapsed.Milliseconds(),
+			Error:          err.Error(),
+		})
+		return false, "", err
+	}
+
+	text := strings.TrimSpace(resp.Content)
+	verdict, issues := parseReflection(text)
+	a.emit(observability.EventReflectionFinished, observability.ReflectionData{
+		Reflection:      n,
+		MaxReflections:  a.maxReflections(),
+		Verdict:         verdict,
+		IssueCount:      issues,
+		CritiquePreview: truncatePreview(text, toolPreviewLen),
+		DurationMS:      elapsed.Milliseconds(),
+	})
+	if verdict == "continue" {
+		return true, buildReflectionMessage(text), nil
+	}
+	return false, "", nil
+}
+
+// parseReflection reads the strict VERDICT contract. Anything that does not
+// explicitly ask to continue is treated as done (avoids critique loops).
+func parseReflection(text string) (verdict string, issues int) {
+	upper := strings.ToUpper(text)
+	switch {
+	case strings.Contains(upper, "VERDICT: CONTINUE"):
+		return "continue", countIssues(text)
+	case strings.Contains(upper, "VERDICT: DONE"):
+		return "done", 0
+	default:
+		return "done", 0
+	}
+}
+
+// countIssues counts numbered/bulleted issue lines in a critique.
+func countIssues(text string) int {
+	n := 0
+	for _, ln := range strings.Split(text, "\n") {
+		t := strings.TrimSpace(ln)
+		if t == "" {
+			continue
+		}
+		if t[0] >= '0' && t[0] <= '9' || strings.HasPrefix(t, "- ") || strings.HasPrefix(t, "* ") {
+			n++
+		}
+	}
+	return n
+}
+
+func buildReflectionMessage(critique string) string {
+	return "[self-reflection] A review of your previous answer found issues. " +
+		"Fix them, then give your final answer.\n\n" + critique
 }

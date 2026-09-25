@@ -88,12 +88,92 @@ var pathishAllowPrefixes = []string{
 // absPathPattern flags absolute paths in a command (unix or windows).
 var absPathPattern = regexp.MustCompile(`(?i)(^|\s)(/[^\s]+|[a-z]:[\\/][^\s]*)`)
 
-// ClassifyShell maps a shell command line to Allow / Ask / Deny.
-func ClassifyShell(command string) Level {
-	cmd := strings.TrimSpace(command)
-	if cmd == "" {
-		return Deny
+// shellSplit divides a command line by shell separators (&&, ||, ;, |, &)
+// into independently classifiable segments. Separator tokens are not included
+// in the returned segments. Quoted strings are preserved intact.
+func shellSplit(cmd string) []string {
+	var segments []string
+	var buf []rune
+	inSingle, inDouble := false, false
+
+	for i := 0; i < len(cmd); i++ {
+		ch := rune(cmd[i])
+
+		// Track quote state (backslash escape handled inside double quotes).
+		if ch == '\'' && !inDouble {
+			inSingle = !inSingle
+			buf = append(buf, ch)
+			continue
+		}
+		if ch == '"' && !inSingle {
+			if inDouble && i+1 < len(cmd) && cmd[i+1] == '\\' {
+				// backslash inside double quote — pass through
+				buf = append(buf, ch)
+				continue
+			}
+			inDouble = !inDouble
+			buf = append(buf, ch)
+			continue
+		}
+
+		if inSingle || inDouble {
+			buf = append(buf, ch)
+			continue
+		}
+
+		// Check two-character operators first.
+		if i+1 < len(cmd) {
+			next := cmd[i+1]
+			if (ch == '&' && next == '&') || (ch == '|' && next == '|') {
+				seg := strings.TrimSpace(string(buf))
+				if seg != "" {
+					segments = append(segments, seg)
+				}
+				buf = buf[:0]
+				i++ // skip next char
+				continue
+			}
+		}
+
+		// Single-character separators.
+		if ch == ';' || ch == '|' || ch == '&' {
+			seg := strings.TrimSpace(string(buf))
+			if seg != "" {
+				segments = append(segments, seg)
+			}
+			buf = buf[:0]
+			continue
+		}
+
+		buf = append(buf, ch)
 	}
+
+	if seg := strings.TrimSpace(string(buf)); seg != "" {
+		segments = append(segments, seg)
+	}
+
+	// Filter out tokens that are pure shell operators (e.g. bare "|" or "&").
+	out := segments[:0]
+	for _, s := range segments {
+		if !isShellOperator(s) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// isShellOperator returns true for tokens that are bare shell operators
+// produced by splitting (e.g. a lone "|" or "&").
+func isShellOperator(s string) bool {
+	switch strings.TrimSpace(s) {
+	case "|", "&", "||", "&&", ";":
+		return true
+	}
+	return false
+}
+
+// classifySingleSegment classifies a single command segment (no chaining).
+func classifySingleSegment(cmd string) Level {
 	lower := strings.ToLower(cmd)
 
 	for _, re := range shellDenyPatterns {
@@ -115,6 +195,37 @@ func ClassifyShell(command string) Level {
 	}
 
 	return Ask
+}
+
+// ClassifyShell maps a shell command line to Allow / Ask / Deny.
+// Command chaining operators (&&, ||, ;, |, &) are split and each segment
+// is classified independently; the most restrictive result wins.
+func ClassifyShell(command string) Level {
+	cmd := strings.TrimSpace(command)
+	if cmd == "" {
+		return Deny
+	}
+
+	segments := shellSplit(cmd)
+	if len(segments) == 0 {
+		return Deny
+	}
+	if len(segments) == 1 {
+		return classifySingleSegment(segments[0])
+	}
+
+	// Multi-segment: most restrictive wins (Deny > Ask > Allow).
+	worst := Allow
+	for _, seg := range segments {
+	 lvl := classifySingleSegment(seg)
+		if lvl == Deny {
+			return Deny
+		}
+		if lvl > worst {
+			worst = lvl
+		}
+	}
+	return worst
 }
 
 func isPathishPrefix(p string) bool {

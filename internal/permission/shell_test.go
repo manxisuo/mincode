@@ -116,3 +116,79 @@ func TestShellAwarePolicy(t *testing.T) {
 		t.Fatal("read_file still allow")
 	}
 }
+
+// Test that command chaining cannot bypass classification.
+func TestClassifyShellChainBypass(t *testing.T) {
+	for _, c := range []string{
+		// && chaining
+		"git status && rm -rf .",
+		"go test ./... && rm -rf .",
+		"go test ./... ; rm -rf .",
+		"go test ./... || rm -rf .",
+		"echo hello | rm -rf .",
+		"go test ./... && rm -rf . && echo done",
+		// single ; separator
+		"git status; rm -rf .",
+		// pipe to destructive command
+		"cat file | rm -rf .",
+	} {
+		if got := ClassifyShell(c); got != Deny {
+			t.Fatalf("%q => %v, want deny", c, got)
+		}
+	}
+}
+
+// Test that safe chaining stays allowed.
+func TestClassifyShellSafeChaining(t *testing.T) {
+	for _, c := range []string{
+		"go test ./... && go build ./...",
+		"go test ./... ; go vet ./...",
+		"git status && git diff",
+		"echo hello && echo world",
+	} {
+		if got := ClassifyShell(c); got != Allow {
+			t.Fatalf("%q => %v, want allow", c, got)
+		}
+	}
+}
+
+// Test that mixed chaining picks the most restrictive.
+func TestClassifyShellMixedChaining(t *testing.T) {
+	for _, c := range []string{
+		"go test ./... ; touch new.txt",
+		"git status && npm install",
+	} {
+		if got := ClassifyShell(c); got != Ask {
+			t.Fatalf("%q => %v, want ask", c, got)
+		}
+	}
+}
+
+// Test shellSplit correctness.
+func TestShellSplit(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"go test", []string{"go test"}},
+		{"git status && rm -rf .", []string{"git status", "rm -rf ."}},
+		{"a ; b ; c", []string{"a", "b", "c"}},
+		{"echo 'hello && world'", []string{"echo 'hello && world'"}},
+		{"echo \"a | b\"", []string{"echo \"a | b\""}},
+		{"cat file | grep foo", []string{"cat file", "grep foo"}},
+		{"echo a && echo b || echo c", []string{"echo a", "echo b", "echo c"}},
+		{"", nil},
+		{"   ", nil},
+	}
+	for _, tt := range tests {
+		got := shellSplit(tt.input)
+		if len(got) != len(tt.want) {
+			t.Fatalf("shellSplit(%q) = %v (len %d), want %v (len %d)", tt.input, got, len(got), tt.want, len(tt.want))
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Fatalf("shellSplit(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
+		}
+	}
+}

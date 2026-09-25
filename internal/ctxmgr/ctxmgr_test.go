@@ -367,6 +367,32 @@ func TestCodeSearchIncluded(t *testing.T) {
 	}
 }
 
+func TestToolResultByCallIDMultiple(t *testing.T) {
+	m := New("SYS", "", 10000)
+	m.AppendAssistant(llm.Message{
+		Role: llm.RoleAssistant,
+		ToolCalls: []llm.ToolCall{
+			{ID: "c1", Name: "code_search", Arguments: `{"query":"one"}`},
+			{ID: "c2", Name: "code_search", Arguments: `{"query":"two"}`},
+			{ID: "c3", Name: "code_search", Arguments: `{"query":"three"}`},
+		},
+	})
+	m.AppendToolResult("c1", "result for one")
+	m.AppendToolResult("c2", "result for two")
+	m.AppendToolResult("c3", "result for three")
+
+	for id, want := range map[string]string{
+		"c1": "result for one",
+		"c2": "result for two",
+		"c3": "result for three",
+	} {
+		got, ok := m.ToolResultByCallID(id)
+		if !ok || got != want {
+			t.Fatalf("call_id=%s got=%q ok=%v want=%q", id, got, ok, want)
+		}
+	}
+}
+
 func TestAppendReflectionSource(t *testing.T) {
 	m := New("SYS", "", 10000)
 	m.AppendUser("do the task")

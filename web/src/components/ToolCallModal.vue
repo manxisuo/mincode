@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -73,10 +73,22 @@ const outputLines = computed(() => {
 const fullText = ref("");
 const loadingFull = ref(false);
 
+// Reset loaded full text whenever another tool call is opened; otherwise the
+// previous call's full result leaks into the next modal (parallel batches make
+// this obvious — every row would show the first result).
+watch(
+  () => [props.open, props.detail?.callId, props.detail?.type] as const,
+  () => {
+    fullText.value = "";
+    loadingFull.value = false;
+  },
+);
+
 async function loadFull() {
   const id = props.detail?.callId;
   if (!id) return;
   loadingFull.value = true;
+  fullText.value = "";
   try {
     const res = await fetch(
       "/api/tools/result?call_id=" + encodeURIComponent(id),

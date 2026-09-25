@@ -571,6 +571,35 @@ button.linkish:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.cfg-modal { width: min(720px, 100%); }
+.cfg-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.cfg-field {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--panel-2);
+}
+.cfg-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.cfg-key code { color: var(--accent); }
+.cfg-key .val { color: var(--ink); font-weight: 600; }
+.cfg-key .win { color: var(--muted); margin-left: auto; }
+.cfg-trail {
+  margin: 4px 0 0 18px;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.cfg-trail .from { color: var(--llm-accent); margin-right: 6px; }
+.cfg-trail .p { margin-left: 6px; opacity: 0.75; word-break: break-all; }
+
 .replay-banner {
   display: flex;
   align-items: center;

@@ -64,6 +64,10 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	if w.Provider != "" {
 		cfg.Provider.Type = w.Provider
 	}
+	resolution := config.Resolve(w.ConfigPath, workspace, os.Getenv, map[string]string{
+		"provider.model": w.Model,
+		"provider.type":  w.Provider,
+	})
 
 	provider, err := buildProvider(cfg)
 	if err != nil {
@@ -171,6 +175,7 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		Provider:  provider.Name(),
 		Model:     provider.Model(),
 		TraceDir:  traceDir,
+		Resolution: resolution,
 	}, ag, bus, metrics, expStore, skillLoader, ws, instrLoader)
 	ag.Approver = srv.WebApprover()
 	srv.SetMemory(memStore)

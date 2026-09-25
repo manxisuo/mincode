@@ -13,6 +13,9 @@ import PlanPanel from "./components/PlanPanel.vue";
 import PermissionBar from "./components/PermissionBar.vue";
 import SessionsPanel from "./components/SessionsPanel.vue";
 import SkillsPanel from "./components/SkillsPanel.vue";
+import ConfigResolutionModal, {
+  type ConfigField,
+} from "./components/ConfigResolutionModal.vue";
 import { apiContextAtStep } from "./api";
 import ToolCallModal, {
   type ToolCallDetail,
@@ -78,6 +81,24 @@ const fileOpen = ref(false);
 const fileDetail = ref<FileChangeDetail | null>(null);
 const toolOpen = ref(false);
 const toolDetail = ref<ToolCallDetail | null>(null);
+const cfgOpen = ref(false);
+const cfgFields = ref<ConfigField[]>([]);
+const cfgFile = ref("");
+
+async function openConfig() {
+  try {
+    const res = await fetch("/api/config");
+    const data = (await res.json()) as {
+      resolution?: { fields?: ConfigField[]; config_file?: string };
+    };
+    cfgFields.value = data.resolution?.fields || [];
+    cfgFile.value = data.resolution?.config_file || "";
+  } catch {
+    cfgFields.value = [];
+    cfgFile.value = "";
+  }
+  cfgOpen.value = true;
+}
 const replaySnap = ref<ContextSnapshot | null>(null);
 const replayStep = ref<number | null>(null);
 
@@ -296,6 +317,12 @@ async function onSwitchSession(id: string) {
       :time-fmt="fmtTime"
       @close="toolOpen = false"
     />
+    <ConfigResolutionModal
+      :open="cfgOpen"
+      :fields="cfgFields"
+      :config-file="cfgFile"
+      @close="cfgOpen = false"
+    />
     <WireRequestModal
       :open="wireOpen"
       :wire="wireRecord"
@@ -374,6 +401,14 @@ async function onSwitchSession(id: string) {
         </nav>
         <button type="button" class="theme-btn" :title="t('app.lang')" @click="toggleLocale()">
           {{ langLabel }}
+        </button>
+        <button
+          type="button"
+          class="theme-btn"
+          :title="t('cfg.title')"
+          @click="openConfig()"
+        >
+          {{ t("cfg.btn") }}
         </button>
         <button type="button" class="theme-btn" :title="themeTitle" @click="toggle()">
           {{ themeIcon }} {{ themeLabel }}

@@ -34,6 +34,8 @@ type Options struct {
 	Model     string
 	// TraceDir is the only directory used for session JSONL traces.
 	TraceDir string
+	// Resolution is the config cascade for T-obs-7 (optional).
+	Resolution any
 }
 
 // Server exposes Agent runtime over HTTP + SSE for the local Web UI.
@@ -116,6 +118,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/decisions", s.handleDecisions)
 	mux.HandleFunc("GET /api/tools/result", s.handleToolResult)
 	mux.HandleFunc("GET /api/metrics", s.handleMetrics)
+	mux.HandleFunc("GET /api/config", s.handleConfigResolution)
 	mux.HandleFunc("GET /api/timeline", s.handleTimeline)
 	mux.HandleFunc("GET /api/traces", s.handleTraceList)
 	mux.HandleFunc("GET /api/traces/{id}", s.handleTraceShow)

@@ -11,7 +11,7 @@ type Config struct {
 
 // WebSearchConfig selects and configures the web search backend.
 type WebSearchConfig struct {
-	// Type is "fake" (offline demo), "tavily" (HTTP), or "" (disabled).
+	// Type is "fake" (offline demo), "tavily" (HTTP), "searxng" (self-hosted), or "" (disabled).
 	Type string `yaml:"type"`
 	// APIKey authenticates the search backend (prefer MINCODE_WEBSEARCH_API_KEY).
 	APIKey string `yaml:"api_key"`

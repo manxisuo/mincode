@@ -57,6 +57,7 @@ func Resolve(path, workspace string, envGet func(string) string, cli map[string]
 		{"agent.compress_at", nil, func() string { return itoa(base.Agent.CompressAt) }, func() string { return "18000" }, false},
 		{"websearch.type", []string{"MINCODE_WEBSEARCH_TYPE"}, func() string { return base.WebSearch.Type }, func() string { return "" }, false},
 		{"websearch.api_key", []string{"MINCODE_WEBSEARCH_API_KEY"}, func() string { return "" }, func() string { return "" }, true},
+		{"websearch.base_url", []string{"MINCODE_WEBSEARCH_BASE_URL"}, func() string { return "" }, func() string { return "" }, false},
 		{"data.location", []string{"MINCODE_DATA_LOCATION"}, func() string { return base.Data.Location }, func() string { return "global" }, false},
 	}
 

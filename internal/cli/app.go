@@ -283,6 +283,11 @@ func buildWebSearch(cfg config.Config) (websearch.Provider, error) {
 			return nil, fmt.Errorf("websearch type %q requires api_key (or MINCODE_WEBSEARCH_API_KEY)", cfg.WebSearch.Type)
 		}
 		return websearch.NewHTTPProvider(cfg.WebSearch.BaseURL, cfg.WebSearch.APIKey, timeout), nil
+	case "searxng":
+		if strings.TrimSpace(cfg.WebSearch.BaseURL) == "" {
+			return nil, fmt.Errorf("websearch type %q requires base_url (e.g. http://localhost:8080)", cfg.WebSearch.Type)
+		}
+		return websearch.NewSearxNGProvider(cfg.WebSearch.BaseURL, timeout), nil
 	default:
 		return nil, fmt.Errorf("unknown websearch type %q", cfg.WebSearch.Type)
 	}

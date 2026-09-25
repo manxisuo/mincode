@@ -252,6 +252,18 @@ func TestBuildWebSearch(t *testing.T) {
 		t.Fatalf("name = %q", tp.Name())
 	}
 
+	// searxng requires a base_url but no api key.
+	if _, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "searxng"}}); err == nil {
+		t.Fatal("searxng without base_url should error")
+	}
+	sp, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "searxng", BaseURL: "http://localhost:8080"}})
+	if err != nil || sp == nil {
+		t.Fatalf("searxng: provider=%v err=%v", sp, err)
+	}
+	if sp.Name() != "searxng" {
+		t.Fatalf("name = %q", sp.Name())
+	}
+
 	if _, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "bogus"}}); err == nil {
 		t.Fatal("unknown type should error")
 	}

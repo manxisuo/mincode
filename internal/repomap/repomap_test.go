@@ -166,6 +166,58 @@ func TestBuildIsBoundedInTime(t *testing.T) {
 	}
 }
 
+func TestBuildCacheReusesUnchangedFiles(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "a.go", "package a\n\nfunc A() { B() }\n")
+	writeFile(t, root, "b.go", "package a\n\nfunc B() {}\n")
+
+	cache := NewCache()
+	first, err := Build(context.Background(), root, Options{MaxTokens: 2000, Cache: cache})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.CacheMisses != 2 || first.CacheHits != 0 {
+		t.Fatalf("first build hits=%d misses=%d, want 0/2", first.CacheHits, first.CacheMisses)
+	}
+	if first.Files[0].Rank.Refs == 0 {
+		t.Fatalf("expected cross-file refs in ranking: %+v", first.Files[0].Rank)
+	}
+
+	second, err := Build(context.Background(), root, Options{MaxTokens: 2000, Cache: cache})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.CacheHits != 2 || second.CacheMisses != 0 {
+		t.Fatalf("second build hits=%d misses=%d, want 2/0", second.CacheHits, second.CacheMisses)
+	}
+	if second.Text != first.Text {
+		t.Fatalf("cached build changed output:\n--- first ---\n%s\n--- second ---\n%s", first.Text, second.Text)
+	}
+}
+
+func TestBuildRankBreakdownFocus(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "a/alpha.go", "package a\n\nfunc Alpha() {}\n")
+	writeFile(t, root, "b/beta.go", "package b\n\nfunc Beta() {}\n")
+
+	m, err := Build(context.Background(), root, Options{MaxTokens: 2000, Focus: "beta"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var beta *FileEntry
+	for i := range m.Files {
+		if m.Files[i].Path == "b/beta.go" {
+			beta = &m.Files[i]
+		}
+	}
+	if beta == nil {
+		t.Fatal("beta.go missing")
+	}
+	if !beta.Rank.PathHit || beta.Rank.FocusBoost == 0 || beta.Rank.Total != beta.Score {
+		t.Fatalf("focus breakdown = %+v (score=%d)", beta.Rank, beta.Score)
+	}
+}
+
 func TestLangAndGenerated(t *testing.T) {
 	cases := map[string]string{
 		"main.go":      "go",

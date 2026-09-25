@@ -125,6 +125,7 @@ mincode web --provider fake         # 离线演示
 | **Skills** | 技能列表、激活/停用、SKILL.md 全文 |
 | **Instructions** | AGENTS.md 层级加载结果 |
 | **Memory** | 跨会话记忆查看与添加 |
+| **Repo Map** | 仓库地图：排名依据（defs/导出/引用/focus 命中）、符号明细、原始文本 |
 | **Sessions** | 会话列表（自动标题）、切换、重命名/备注/删除 |
 | **Experiments** | 实验对比看板 |
 
@@ -138,6 +139,7 @@ mincode web --provider fake         # 离线演示
   - `file.changed` → 路径 / operation / Diff
   - `tool.*` → 结构化 args 键值表与 result 预览
 - **权限**：顶部 Permission Bar 展示待批工具与 diff，可 Allow / Deny
+- **Repo Map**：`GET /api/repomap` 复用 Agent 同一增量缓存；支持 `path`/`focus` 过滤，逐行展示排名依据
 - **History**：可加载历史 trace JSONL，勾选 JSON 查看原始事件
 
 前端源码在 `web/`，生产资源由 Vite 构建到 `web/dist/` 后 `embed` 进二进制。**改前端后必须**重新：

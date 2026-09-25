@@ -16,6 +16,7 @@ import (
 	"github.com/manxisuo/mincode/internal/observability"
 	"github.com/manxisuo/mincode/internal/paths"
 	"github.com/manxisuo/mincode/internal/permission"
+	"github.com/manxisuo/mincode/internal/repomap"
 	"github.com/manxisuo/mincode/internal/server"
 	"github.com/manxisuo/mincode/internal/session"
 	"github.com/manxisuo/mincode/internal/skill"
@@ -129,6 +130,12 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		})
 	}
 
+	// Repository map: shared cache between the agent tool and the Web API.
+	repoCache := repomap.NewCache()
+	if cfg.RepoMapEnabled() {
+		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache})
+	}
+
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
 	ag := agent.NewWithCompress(provider, registry, bus, sessionID, cfg.Agent.MaxSteps,
 		sysPrompt, cfg.Agent.TokenBudget, cfg.Agent.CompressAt)
@@ -168,6 +175,27 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		ag.Ctx.SetMemory(memStore.Compose())
 	}
 
+	if cfg.RepoMapEnabled() {
+		buildCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if m, err := repomap.Build(buildCtx, workspace, repomap.Options{MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache}); err == nil {
+			ag.Ctx.SetRepoMap(m.Text)
+			bus.Publish(observability.NewEvent(sessionID, 0, observability.EventRepoMapBuilt,
+				observability.RepoMapData{
+					Files:     len(m.Files),
+					Symbols:   countRepoMapSymbols(m),
+					Tokens:    m.Tokens,
+					Scanned:   m.Scanned,
+					Skipped:   m.Skipped,
+					BuildMS:   m.BuildMS,
+					Truncated: m.Truncated,
+					Reason:    "startup",
+				}))
+		} else {
+			fmt.Fprintf(os.Stderr, "mincode web: repo map: %v\n", err)
+		}
+		cancel()
+	}
+
 	addr := w.Addr
 	if addr == "" {
 		addr = "127.0.0.1:8080"
@@ -185,13 +213,16 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	}
 
 	srv := server.New(server.Options{
-		Addr:       addr,
-		Workspace:  workspace,
-		SessionID:  sessionID,
-		Provider:   provider.Name(),
-		Model:      provider.Model(),
-		TraceDir:   traceDir,
-		Resolution: resolution,
+		Addr:           addr,
+		Workspace:      workspace,
+		SessionID:      sessionID,
+		Provider:       provider.Name(),
+		Model:          provider.Model(),
+		TraceDir:       traceDir,
+		Resolution:     resolution,
+		RepoMapEnabled: cfg.RepoMapEnabled(),
+		RepoMapTokens:  cfg.Agent.RepoMapTokens,
+		RepoMapCache:   repoCache,
 	}, ag, bus, metrics, expStore, skillLoader, ws, instrLoader)
 	ag.Approver = srv.WebApprover()
 	srv.SetMemory(memStore)

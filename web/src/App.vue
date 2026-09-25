@@ -11,12 +11,13 @@ import MemoryPanel from "./components/MemoryPanel.vue";
 import PermissionHistoryModal from "./components/PermissionHistoryModal.vue";
 import PlanPanel from "./components/PlanPanel.vue";
 import PermissionBar from "./components/PermissionBar.vue";
+import RepoMapPanel from "./components/RepoMapPanel.vue";
 import SessionsPanel from "./components/SessionsPanel.vue";
 import SkillsPanel from "./components/SkillsPanel.vue";
 import ConfigResolutionModal, {
   type ConfigField,
 } from "./components/ConfigResolutionModal.vue";
-import { apiContextAtStep } from "./api";
+import { apiContext, apiContextAtStep } from "./api";
 import ToolCallModal, {
   type ToolCallDetail,
 } from "./components/ToolCallModal.vue";
@@ -52,6 +53,7 @@ const view = ref<
   | "skills"
   | "instructions"
   | "memory"
+  | "repomap"
   | "sessions"
   | "experiments"
 >("inspector");
@@ -386,6 +388,13 @@ async function onSwitchSession(id: string) {
           </button>
           <button
             type="button"
+            :class="{ active: view === 'repomap' }"
+            @click="view = 'repomap'"
+          >
+            {{ t("nav.repomap") }}
+          </button>
+          <button
+            type="button"
             :class="{ active: view === 'sessions' }"
             @click="view = 'sessions'"
           >
@@ -444,6 +453,7 @@ async function onSwitchSession(id: string) {
           view === 'skills' ||
           view === 'instructions' ||
           view === 'memory' ||
+          view === 'repomap' ||
           view === 'sessions',
       }"
     >
@@ -481,6 +491,7 @@ async function onSwitchSession(id: string) {
         :open-path="openInstructionPath"
       />
       <MemoryPanel v-else-if="view === 'memory'" />
+      <RepoMapPanel v-else-if="view === 'repomap'" />
       <SessionsPanel
         v-else-if="view === 'sessions'"
         :load-session="onSwitchSession"

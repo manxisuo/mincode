@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -32,6 +33,10 @@ const (
 	maxFileBytes     = 512 * 1024
 	maxSymbolsFile   = 12
 	scoreSymbolCap   = 20
+	scoreRefCap      = 40
+	scoreFocusPath   = 300
+	scoreFocusSymbol = 80
+	scoreFocusHits   = 5
 	maxSigLen        = 110
 )
 
@@ -62,6 +67,70 @@ type Options struct {
 	Subpath string
 	// Focus boosts files/symbols whose path or symbol name contains this term.
 	Focus string
+	// Cache, when set, reuses symbol extraction for files unchanged since the
+	// last build (keyed by absolute path + mtime + size).
+	Cache *Cache
+}
+
+// maxCacheEntries bounds the incremental cache so a long-lived process cannot
+// grow it without limit.
+const maxCacheEntries = 20000
+
+type cacheEntry struct {
+	modTime int64
+	size    int64
+	entry   FileEntry
+	idents  map[string]int
+}
+
+// Cache memoizes per-file symbol extraction across builds. Safe for concurrent
+// use. A zero Cache is not usable; call NewCache.
+type Cache struct {
+	mu     sync.Mutex
+	files  map[string]cacheEntry
+	hits   int
+	misses int
+}
+
+// NewCache returns an empty incremental cache.
+func NewCache() *Cache {
+	return &Cache{files: make(map[string]cacheEntry)}
+}
+
+func (c *Cache) get(abs string, modTime, size int64) (FileEntry, map[string]int, bool) {
+	if c == nil {
+		return FileEntry{}, nil, false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ce, ok := c.files[abs]
+	if !ok || ce.modTime != modTime || ce.size != size {
+		c.misses++
+		return FileEntry{}, nil, false
+	}
+	c.hits++
+	return ce.entry, ce.idents, true
+}
+
+func (c *Cache) put(abs string, modTime, size int64, e FileEntry, idents map[string]int) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.files) >= maxCacheEntries {
+		c.files = make(map[string]cacheEntry)
+	}
+	c.files[abs] = cacheEntry{modTime: modTime, size: size, entry: e, idents: idents}
+}
+
+func (c *Cache) stats() (hits, misses int) {
+	if c == nil {
+		return 0, 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.hits, c.misses
 }
 
 // Symbol is one top-level declaration.
@@ -72,15 +141,32 @@ type Symbol struct {
 	Line int    `json:"line,omitempty"`
 }
 
+// ScoreBreakdown explains how one file's rank score was computed. It lets the
+// inspector show the ranking rationale (refs / focus hits) instead of a bare
+// number, without guessing.
+type ScoreBreakdown struct {
+	Defs        int  `json:"defs"`
+	DefsCapped  bool `json:"defs_capped,omitempty"`
+	Exported    int  `json:"exported"`
+	Refs        int  `json:"refs"`
+	RefsCapped  bool `json:"refs_capped,omitempty"`
+	FocusBoost  int  `json:"focus_boost,omitempty"`
+	PathHit     bool `json:"path_hit,omitempty"`
+	SymbolHits  int  `json:"symbol_hits,omitempty"`
+	TestPenalty int  `json:"test_penalty,omitempty"` // negative
+	Total       int  `json:"total"`
+}
+
 // FileEntry is one file in the map.
 type FileEntry struct {
-	Path      string   `json:"path"`
-	Lang      string   `json:"lang"`
-	Package   string   `json:"package,omitempty"`
-	Lines     int      `json:"lines,omitempty"`
-	Symbols   []Symbol `json:"symbols,omitempty"`
-	Score     int      `json:"score"`
-	Truncated bool     `json:"truncated,omitempty"`
+	Path      string         `json:"path"`
+	Lang      string         `json:"lang"`
+	Package   string         `json:"package,omitempty"`
+	Lines     int            `json:"lines,omitempty"`
+	Symbols   []Symbol       `json:"symbols,omitempty"`
+	Score     int            `json:"score"`
+	Rank      ScoreBreakdown `json:"rank"`
+	Truncated bool           `json:"truncated,omitempty"`
 }
 
 // Map is the result of one build.
@@ -95,12 +181,18 @@ type Map struct {
 	Skipped   int         `json:"skipped"`
 	Truncated bool        `json:"truncated"`
 	BuildMS   int64       `json:"build_ms"`
+	// CacheHits / CacheMisses report incremental-cache reuse for this build
+	// (both 0 when no cache is configured).
+	CacheHits   int `json:"cache_hits,omitempty"`
+	CacheMisses int `json:"cache_misses,omitempty"`
 }
 
 type rawFile struct {
-	abs  string
-	rel  string
-	lang string
+	abs     string
+	rel     string
+	lang    string
+	size    int64
+	modTime int64
 }
 
 // Build scans workspace (optionally limited to opts.Subpath) and returns a
@@ -152,21 +244,34 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 	}
 
 	entries := make([]FileEntry, 0, len(candidates))
-	asts := make(map[string]*ast.File)
+	identsByPath := make(map[string]map[string]int)
+	hitsBefore, missesBefore := opts.Cache.stats()
 	for _, rf := range candidates {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		e, tree := analyze(rf)
+		var e FileEntry
+		var idents map[string]int
+		if cached, cachedIdents, ok := opts.Cache.get(rf.abs, rf.modTime, rf.size); ok {
+			e = cached
+			idents = cachedIdents
+			// Rel path is derived per build; keep it authoritative.
+			e.Path = rf.rel
+		} else {
+			e, idents = analyze(rf)
+			opts.Cache.put(rf.abs, rf.modTime, rf.size, e, idents)
+		}
 		entries = append(entries, e)
-		if tree != nil {
-			asts[e.Path] = tree
+		if idents != nil {
+			identsByPath[e.Path] = idents
 		}
 	}
 
-	refs := refCounts(entries, asts)
+	refs := refCounts(entries, identsByPath)
 	for i := range entries {
-		entries[i].Score = score(&entries[i], refs[entries[i].Path], opts.Focus)
+		b := scoreBreakdown(&entries[i], refs[entries[i].Path], opts.Focus)
+		entries[i].Score = b.Total
+		entries[i].Rank = b
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		if entries[i].Score != entries[j].Score {
@@ -181,6 +286,9 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 
 	m.Text = render(m, entries, opts.MaxTokens)
 	m.Tokens = ctxmgr.EstimateTokens(m.Text)
+	hitsAfter, missesAfter := opts.Cache.stats()
+	m.CacheHits = hitsAfter - hitsBefore
+	m.CacheMisses = missesAfter - missesBefore
 	m.BuildMS = time.Since(start).Milliseconds()
 	return m, nil
 }
@@ -224,7 +332,13 @@ func scanFiles(ctx context.Context, base, scanRoot string) ([]rawFile, int, int,
 		if scanned > DefaultScanCap {
 			return fs.SkipAll
 		}
-		out = append(out, rawFile{abs: path, rel: filepath.ToSlash(rel), lang: lang})
+		out = append(out, rawFile{
+			abs:     path,
+			rel:     filepath.ToSlash(rel),
+			lang:    lang,
+			size:    info.Size(),
+			modTime: info.ModTime().UnixNano(),
+		})
 		return nil
 	})
 	if err != nil && err != fs.SkipAll {
@@ -233,9 +347,9 @@ func scanFiles(ctx context.Context, base, scanRoot string) ([]rawFile, int, int,
 	return out, scanned, skipped, nil
 }
 
-// analyze extracts symbols from one candidate. tree is non-nil only for
-// successfully parsed Go files.
-func analyze(rf rawFile) (FileEntry, *ast.File) {
+// analyze extracts symbols and identifier usage from one candidate. idents is
+// non-nil only for successfully parsed Go files (used for ranking + caching).
+func analyze(rf rawFile) (FileEntry, map[string]int) {
 	if rf.lang != "go" {
 		return FileEntry{Path: rf.rel, Lang: rf.lang}, nil
 	}
@@ -255,7 +369,20 @@ func analyze(rf rawFile) (FileEntry, *ast.File) {
 		Lines:   fset.Position(f.End()).Line,
 		Symbols: extractSymbols(fset, f),
 	}
-	return e, f
+	return e, extractIdents(f)
+}
+
+// extractIdents counts identifier occurrences in a Go file. Used as a cheap
+// cross-file reference signal (centrality proxy) and cached between builds.
+func extractIdents(f *ast.File) map[string]int {
+	ids := map[string]int{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok && id.Name != "" && id.Name != "_" {
+			ids[id.Name]++
+		}
+		return true
+	})
+	return ids
 }
 
 func extractSymbols(fset *token.FileSet, f *ast.File) []Symbol {
@@ -354,11 +481,18 @@ func kindOfType(e ast.Expr) string {
 
 // refCounts is a cheap centrality proxy: for each Go file, how many identifiers
 // it uses that are exported top-level names defined in a different file.
-func refCounts(entries []FileEntry, asts map[string]*ast.File) map[string]int {
+func refCounts(entries []FileEntry, identsByPath map[string]map[string]int) map[string]int {
 	defined := map[string]string{}
+	localByPath := map[string]map[string]bool{}
 	for _, e := range entries {
+		local := localByPath[e.Path]
+		if local == nil {
+			local = map[string]bool{}
+			localByPath[e.Path] = local
+		}
 		for _, s := range e.Symbols {
 			name := lastName(s.Name)
+			local[name] = true
 			if !isExported(name) {
 				continue
 			}
@@ -367,60 +501,64 @@ func refCounts(entries []FileEntry, asts map[string]*ast.File) map[string]int {
 			}
 		}
 	}
-	refs := make(map[string]int, len(asts))
-	for path, f := range asts {
-		local := map[string]bool{}
-		for _, s := range entries {
-			if s.Path == path {
-				for _, sym := range s.Symbols {
-					local[lastName(sym.Name)] = true
-				}
+	refs := make(map[string]int, len(identsByPath))
+	for path, ids := range identsByPath {
+		local := localByPath[path]
+		for name, count := range ids {
+			if def, ok := defined[name]; ok && def != path && !local[name] {
+				refs[path] += count
 			}
 		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			id, ok := n.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			if def, ok := defined[id.Name]; ok && def != path && !local[id.Name] {
-				refs[path]++
-			}
-			return true
-		})
 	}
 	return refs
 }
 
-func score(e *FileEntry, refs int, focus string) int {
-	s := 0
-	exported := 0
+// scoreBreakdown computes and explains one file's rank score.
+func scoreBreakdown(e *FileEntry, refs int, focus string) ScoreBreakdown {
+	b := ScoreBreakdown{Defs: len(e.Symbols), Refs: refs}
 	for _, sym := range e.Symbols {
 		if isExported(lastName(sym.Name)) {
-			exported++
+			b.Exported++
 		}
 	}
-	// Cap the raw definition count so a couple of huge files cannot crowd out
-	// the rest of the repository; cross-file references carry more signal.
+	// Cap the raw definition and reference counts so a couple of huge files
+	// cannot crowd out the rest of the repository.
 	defs := len(e.Symbols)
 	if defs > scoreSymbolCap {
 		defs = scoreSymbolCap
+		b.DefsCapped = true
 	}
-	s += defs + exported*2 + refs*2
+	refsScore := refs
+	if refsScore > scoreRefCap {
+		refsScore = scoreRefCap
+		b.RefsCapped = true
+	}
+	s := defs + b.Exported*2 + refsScore*2
 	if strings.HasSuffix(e.Path, "_test.go") {
+		b.TestPenalty = -5
 		s -= 5
 	}
 	if focus != "" {
 		lp := strings.ToLower(focus)
 		if strings.Contains(strings.ToLower(e.Path), lp) {
-			s += 50
+			b.PathHit = true
+			b.FocusBoost += scoreFocusPath
 		}
+		hits := 0
 		for _, sym := range e.Symbols {
 			if strings.Contains(strings.ToLower(sym.Name), lp) {
-				s += 20
+				hits++
 			}
 		}
+		b.SymbolHits = hits
+		if hits > scoreFocusHits {
+			hits = scoreFocusHits
+		}
+		b.FocusBoost += hits * scoreFocusSymbol
+		s += b.FocusBoost
 	}
-	return s
+	b.Total = s
+	return b
 }
 
 // render writes ranked files until the token budget is exhausted. Top files get

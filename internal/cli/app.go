@@ -63,6 +63,7 @@ type App struct {
 	mem        *memory.Store
 	plans      *plan.Manager
 	repoMap    *repomap.Map
+	repoCache  *repomap.Cache
 	lastResult *agent.Result
 	out        io.Writer
 	echoTools  atomic.Bool
@@ -160,8 +161,9 @@ func NewApp(opts Options) (*App, error) {
 		})
 	}
 
+	repoCache := repomap.NewCache()
 	if cfg.RepoMapEnabled() {
-		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens})
+		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache})
 	}
 
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
@@ -208,6 +210,7 @@ func NewApp(opts Options) (*App, error) {
 		skills:    skillLoader,
 		mem:       memStore,
 		plans:     plan.NewManager(),
+		repoCache: repoCache,
 		out:       os.Stdout,
 	}
 
@@ -410,7 +413,7 @@ func (a *App) loadRepoMap() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	m, err := repomap.Build(ctx, a.workspace, repomap.Options{MaxTokens: a.cfg.Agent.RepoMapTokens})
+	m, err := repomap.Build(ctx, a.workspace, repomap.Options{MaxTokens: a.cfg.Agent.RepoMapTokens, Cache: a.repoCache})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mincode: repo map: %v\n", err)
 		return

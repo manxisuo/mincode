@@ -650,15 +650,26 @@ websearch:
 internal/repomap   Build(ctx, workspace, Options) → ranked + budgeted Map
   Go 文件: 标准库 go/ast 提取 func / method / type / struct / interface / const / var
   其他语言: 仅列路径 + 语言（不引第三方解析器）
-  排名: 导出符号权重 + 跨文件引用计数（轻量中心度）+ 路径/符号 focus 加权
+  排名: 导出符号 + 跨文件引用计数（均封顶）+ focus 加权 + 测试惩罚
   预算: MaxTokens 截断；跳过 vendor/node_modules/.git/.mincode/dist 等与生成文件
+  缓存: Cache（abs path + mtime + size）复用符号与标识符统计，跨调用增量
 ```
 
 - **启动注入**：`agent.repo_map`（默认 true）构建一次，作为 pinned system
   context（`source=repo_map`），预算 `agent.repo_map_tokens`（默认 1500）。
 - **repo_map 工具**：只读、可并行；参数 `path`（限定子目录）、`focus`
   （加权关键词）、`max_tokens`（硬上限 4000），用于按需刷新子图。
+- **数据血缘/增量**：`FileEntry.Rank` 带 `defs/exported/refs/focus/path_hit/symbol_hits/test_penalty`，
+  排名可解释；Agent 工具与 Web API 共享同一 `Cache`。
 - `/repomap` 命令查看当前注入的 map 与统计。
+
+### Web Inspector
+
+```text
+GET /api/repomap[?path=&focus=&max_tokens=]
+Web: Repo Map 页签 — 排名表（得分 + 依据 chips）、符号明细、原始地图文本
+     支持子目录/聚焦词刷新；复用 Agent 的增量缓存，二次构建 ~0ms
+```
 
 ### 可观测
 
@@ -666,6 +677,7 @@ internal/repomap   Build(ctx, workspace, Options) → ranked + budgeted Map
 repo_map.built（root/subpath/focus/files/scanned/skipped/symbols/tokens/build_ms/truncated/reason）
 Context snapshot: source=repo_map（pinned）
 启动 reason=startup；工具调用 reason=agent tool
+API 响应含 cache_hits/cache_misses（本次构建的增量命中）
 ```
 
 ### 配置
@@ -681,7 +693,7 @@ agent:
 ```text
 tree-sitter / 多语言精确符号（非 Go 仅列路径）
 语义 / embedding 排序（后续 Semantic Code Search）
-持续增量缓存（每次构建都重新扫描，受 scanCap 与 5s 超时约束）
+缓存落盘 / 跨进程共享（当前为进程内缓存，快速路径为 mtime+size）
 ```
 
 ---

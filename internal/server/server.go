@@ -19,6 +19,7 @@ import (
 	"github.com/manxisuo/mincode/internal/memory"
 	"github.com/manxisuo/mincode/internal/observability"
 	"github.com/manxisuo/mincode/internal/plan"
+	"github.com/manxisuo/mincode/internal/repomap"
 	"github.com/manxisuo/mincode/internal/session"
 	"github.com/manxisuo/mincode/internal/skill"
 	"github.com/manxisuo/mincode/internal/tools"
@@ -36,6 +37,12 @@ type Options struct {
 	TraceDir string
 	// Resolution is the config cascade for T-obs-7 (optional).
 	Resolution any
+	// RepoMapEnabled / RepoMapTokens expose the context repo map to the UI.
+	RepoMapEnabled bool
+	RepoMapTokens  int
+	// RepoMapCache shares incremental parsing with the agent's repo_map tool
+	// (optional; a private cache is created when nil).
+	RepoMapCache *repomap.Cache
 }
 
 // Server exposes Agent runtime over HTTP + SSE for the local Web UI.
@@ -53,6 +60,7 @@ type Server struct {
 	instr        *instruction.Loader
 	mem          *memory.Store
 	sessions     *session.Store
+	repoCache    *repomap.Cache
 	activeSessID string
 	permMu       sync.Mutex
 	pendingPerms map[string]*pendingPerm
@@ -92,6 +100,7 @@ func New(opts Options, ag *agent.Agent, bus *observability.Bus, metrics *observa
 		skills:       skills,
 		ws:           ws,
 		instr:        instr,
+		repoCache:    repoMapCache(opts.RepoMapCache),
 		pendingPerms: map[string]*pendingPerm{},
 		hub:          newEventHub(),
 		activeSessID: opts.SessionID,
@@ -102,6 +111,14 @@ func New(opts Options, ag *agent.Agent, bus *observability.Bus, metrics *observa
 		})
 	}
 	return s
+}
+
+// repoMapCache returns the provided cache or a fresh one.
+func repoMapCache(c *repomap.Cache) *repomap.Cache {
+	if c != nil {
+		return c
+	}
+	return repomap.NewCache()
 }
 
 // Handler returns the HTTP mux.
@@ -139,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/instructions/reload", s.handleInstructionReload)
 	mux.HandleFunc("GET /api/memory", s.handleMemoryGet)
 	mux.HandleFunc("POST /api/memory", s.handleMemoryAdd)
+	mux.HandleFunc("GET /api/repomap", s.handleRepoMap)
 	mux.HandleFunc("GET /api/sessions", s.handleSessionList)
 	mux.HandleFunc("GET /api/sessions/current", s.handleSessionCurrent)
 	mux.HandleFunc("POST /api/sessions/{id}/load", s.handleSessionLoad)

@@ -23,6 +23,8 @@ type RepoMap struct {
 	MaxTokens int
 	// MaxFiles caps rendered files.
 	MaxFiles int
+	// Cache, when set, reuses parsing across repeated calls.
+	Cache *repomap.Cache
 }
 
 func (t *RepoMap) Name() string { return "repo_map" }
@@ -108,6 +110,7 @@ func (t *RepoMap) Execute(ctx context.Context, raw json.RawMessage) (Result, err
 		MaxFiles:  t.MaxFiles,
 		Subpath:   rel,
 		Focus:     strings.TrimSpace(args.Focus),
+		Cache:     t.Cache,
 	})
 	if err != nil {
 		return Result{Content: "repo_map: " + err.Error(), IsError: true}, nil
@@ -116,15 +119,17 @@ func (t *RepoMap) Execute(ctx context.Context, raw json.RawMessage) (Result, err
 	return Result{
 		Content: m.Text,
 		Meta: map[string]any{
-			"path":      rel,
-			"focus":     strings.TrimSpace(args.Focus),
-			"files":     len(m.Files),
-			"symbols":   countSymbols(m),
-			"tokens":    m.Tokens,
-			"scanned":   m.Scanned,
-			"skipped":   m.Skipped,
-			"truncated": m.Truncated,
-			"build_ms":  m.BuildMS,
+			"path":         rel,
+			"focus":        strings.TrimSpace(args.Focus),
+			"files":        len(m.Files),
+			"symbols":      countSymbols(m),
+			"tokens":       m.Tokens,
+			"scanned":      m.Scanned,
+			"skipped":      m.Skipped,
+			"truncated":    m.Truncated,
+			"build_ms":     m.BuildMS,
+			"cache_hits":   m.CacheHits,
+			"cache_misses": m.CacheMisses,
 		},
 	}, nil
 }

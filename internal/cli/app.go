@@ -979,6 +979,11 @@ func formatMetrics(m observability.Metrics) string {
 	b.WriteString(metricRow("Output Tokens", yellow(formatInt(m.OutputTokens)), ""))
 	b.WriteString(metricRow("Total Tokens", bold(yellow(formatInt(m.TotalTokens))), ""))
 	b.WriteString(metricRow("LLM Time", blue(m.LLMDuration.Round(time.Millisecond).String()), ""))
+	if m.RepoMapBuilds > 0 {
+		rate := fmt.Sprintf("%.0f%%", m.RepoMapHitRate()*100)
+		b.WriteString(metricRow("Repo Map", green(rate),
+			fmt.Sprintf("cache %d/%d", m.RepoMapCacheHits, m.RepoMapCacheTotal())))
+	}
 	return b.String()
 }
 

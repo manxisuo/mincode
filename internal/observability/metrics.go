@@ -24,6 +24,26 @@ type Metrics struct {
 	StreamDeltas int
 	// LastTTFTMS is the most recent time-to-first-token in milliseconds.
 	LastTTFTMS int64
+	// RepoMapBuilds counts repo_map.built events (startup + agent tool).
+	RepoMapBuilds int
+	// RepoMapCacheHits / RepoMapCacheMisses aggregate incremental-cache reuse
+	// across repository-map builds.
+	RepoMapCacheHits   int
+	RepoMapCacheMisses int
+}
+
+// RepoMapCacheTotal returns cache lookups (hits + misses) this session.
+func (m Metrics) RepoMapCacheTotal() int {
+	return m.RepoMapCacheHits + m.RepoMapCacheMisses
+}
+
+// RepoMapHitRate returns hits / (hits+misses) in [0,1]; 0 when no lookups.
+func (m Metrics) RepoMapHitRate() float64 {
+	total := m.RepoMapCacheTotal()
+	if total == 0 {
+		return 0
+	}
+	return float64(m.RepoMapCacheHits) / float64(total)
 }
 
 // MetricsCollector folds events into Metrics. Safe for sequential bus delivery.
@@ -68,6 +88,12 @@ func (c *MetricsCollector) Handle(e Event) {
 		if data, ok := asToolData(e.Data); ok && data.Parallel {
 			c.m.ParallelToolCalls++
 		}
+	case EventRepoMapBuilt:
+		if data, ok := asRepoMapData(e.Data); ok {
+			c.m.RepoMapBuilds++
+			c.m.RepoMapCacheHits += data.CacheHits
+			c.m.RepoMapCacheMisses += data.CacheMisses
+		}
 	}
 }
 
@@ -98,7 +124,19 @@ func (m Metrics) Format() string {
 	if m.LastTTFTMS > 0 {
 		fmt.Fprintf(&b, "Last TTFT        %dms\n", m.LastTTFTMS)
 	}
+	if m.RepoMapBuilds > 0 {
+		fmt.Fprintf(&b, "Repo Map Builds  %d\n", m.RepoMapBuilds)
+		fmt.Fprintf(&b, "Repo Map Cache   %s\n", formatHitRate(m.RepoMapHitRate(), m.RepoMapCacheHits, m.RepoMapCacheTotal()))
+	}
 	return b.String()
+}
+
+// formatHitRate renders "88% (7/8)" for one cache hit-rate metric.
+func formatHitRate(rate float64, hits, total int) string {
+	if total == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%.0f%% (%d/%d)", rate*100, hits, total)
 }
 
 func formatInt(n int) string {
@@ -178,6 +216,25 @@ func asBatchData(v any) (ToolBatchData, bool) {
 		return out, true
 	}
 	return ToolBatchData{}, false
+}
+
+// asRepoMapData extracts repo_map.built cache counters (struct or JSON map).
+func asRepoMapData(v any) (RepoMapData, bool) {
+	switch d := v.(type) {
+	case RepoMapData:
+		return d, true
+	case *RepoMapData:
+		if d == nil {
+			return RepoMapData{}, false
+		}
+		return *d, true
+	case map[string]any:
+		out := RepoMapData{}
+		out.CacheHits = intFromAny(d["cache_hits"])
+		out.CacheMisses = intFromAny(d["cache_misses"])
+		return out, true
+	}
+	return RepoMapData{}, false
 }
 
 func asToolData(v any) (ToolEventData, bool) {

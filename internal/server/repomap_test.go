@@ -107,3 +107,25 @@ func TestRepoMapAPIDisabled(t *testing.T) {
 		t.Fatalf("enabled = %v, want false", data["enabled"])
 	}
 }
+
+func TestMetricsAPIIncludesRepoMapCache(t *testing.T) {
+	ag, bus, metrics := testAgent(t)
+	srv := New(Options{
+		Addr:      "127.0.0.1:0",
+		Workspace: t.TempDir(),
+		SessionID: "web-test",
+	}, ag, bus, metrics, nil, nil, nil, nil)
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	bus.Publish(observability.NewEvent("web-test", 0, observability.EventRepoMapBuilt,
+		observability.RepoMapData{CacheHits: 7, CacheMisses: 3}))
+
+	data := getJSON(t, ts.URL+"/api/metrics")
+	if data["repo_map_builds"] != float64(1) {
+		t.Fatalf("repo_map_builds = %v", data["repo_map_builds"])
+	}
+	if data["repo_map_cache_hits"] != float64(7) || data["repo_map_cache_misses"] != float64(3) {
+		t.Fatalf("cache = %v/%v", data["repo_map_cache_hits"], data["repo_map_cache_misses"])
+	}
+}

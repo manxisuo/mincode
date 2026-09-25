@@ -110,6 +110,9 @@ export interface MetricsInfo {
   llm_duration_ms?: number;
   parallel_batches?: number;
   parallel_tool_calls?: number;
+  repo_map_builds?: number;
+  repo_map_cache_hits?: number;
+  repo_map_cache_misses?: number;
 }
 
 export type PlanStatus =

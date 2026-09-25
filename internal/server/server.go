@@ -437,17 +437,20 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		m = s.metrics.Snapshot()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"llm_calls":           m.LLMCalls,
-		"errors":              m.Errors,
-		"input_tokens":        m.InputTokens,
-		"output_tokens":       m.OutputTokens,
-		"total_tokens":        m.TotalTokens,
-		"llm_duration_ms":     m.LLMDuration.Milliseconds(),
-		"parallel_batches":    m.ParallelBatches,
-		"parallel_tool_calls": m.ParallelToolCalls,
-		"stream_calls":        m.StreamCalls,
-		"stream_deltas":       m.StreamDeltas,
-		"last_ttft_ms":        m.LastTTFTMS,
+		"llm_calls":             m.LLMCalls,
+		"errors":                m.Errors,
+		"input_tokens":          m.InputTokens,
+		"output_tokens":         m.OutputTokens,
+		"total_tokens":          m.TotalTokens,
+		"llm_duration_ms":       m.LLMDuration.Milliseconds(),
+		"parallel_batches":      m.ParallelBatches,
+		"parallel_tool_calls":   m.ParallelToolCalls,
+		"stream_calls":          m.StreamCalls,
+		"stream_deltas":         m.StreamDeltas,
+		"last_ttft_ms":          m.LastTTFTMS,
+		"repo_map_builds":       m.RepoMapBuilds,
+		"repo_map_cache_hits":   m.RepoMapCacheHits,
+		"repo_map_cache_misses": m.RepoMapCacheMisses,
 	})
 }
 

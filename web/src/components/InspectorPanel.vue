@@ -28,6 +28,14 @@ const emit = defineEmits<{
   "exit-replay": [];
 }>();
 
+const repoCache = computed(() => {
+  const hits = props.metrics.repo_map_cache_hits ?? 0;
+  const misses = props.metrics.repo_map_cache_misses ?? 0;
+  const total = hits + misses;
+  if (!total) return "—";
+  return `${Math.round((hits / total) * 100)}%`;
+});
+
 function isDeeplink(e: RuntimeEvent): boolean {
   const t = typeof e.type === "string" ? e.type : "";
   return (
@@ -543,6 +551,7 @@ function rawJson(e: RuntimeEvent) {
       <div class="m"><span>LLM Time</span><b>{{ metrics.llm_duration_ms ?? 0 }}ms</b></div>
       <div class="m"><span>∥ Batches</span><b>{{ metrics.parallel_batches ?? 0 }}</b></div>
       <div class="m"><span>Errors</span><b>{{ metrics.errors ?? 0 }}</b></div>
+      <div class="m"><span>Repo Cache</span><b>{{ repoCache }}</b></div>
     </div>
 
     <div class="subhead togglable" @click="ctxOpen = !ctxOpen">

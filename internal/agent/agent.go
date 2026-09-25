@@ -473,6 +473,7 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 	}
 
 	a.loadInstructionsForTool(tc, result)
+	a.emitRepoMapFromTool(tc.Name, result)
 
 	preview := result.Content
 	if len(preview) > toolPreviewLen {
@@ -528,6 +529,44 @@ func (a *Agent) loadInstructionsForTool(tc llm.ToolCall, result tools.Result) {
 		})
 	}
 	a.Ctx.SetInstructions(a.Instr.Compose())
+}
+
+// emitRepoMapFromTool surfaces on-demand repo_map builds as structured events.
+func (a *Agent) emitRepoMapFromTool(name string, result tools.Result) {
+	if name != "repo_map" || result.IsError || result.Meta == nil {
+		return
+	}
+	sub, _ := result.Meta["path"].(string)
+	focus, _ := result.Meta["focus"].(string)
+	a.emit(observability.EventRepoMapBuilt, observability.RepoMapData{
+		Subpath:   sub,
+		Focus:     focus,
+		Files:     metaInt(result.Meta["files"]),
+		Scanned:   metaInt(result.Meta["scanned"]),
+		Skipped:   metaInt(result.Meta["skipped"]),
+		Symbols:   metaInt(result.Meta["symbols"]),
+		Tokens:    metaInt(result.Meta["tokens"]),
+		BuildMS:   int64(metaInt(result.Meta["build_ms"])),
+		Truncated: metaBool(result.Meta["truncated"]),
+		Reason:    "agent tool",
+	})
+}
+
+func metaInt(v any) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	}
+	return 0
+}
+
+func metaBool(v any) bool {
+	b, _ := v.(bool)
+	return b
 }
 
 // pathFromArgs extracts a "path" field from a tool-arguments JSON object.

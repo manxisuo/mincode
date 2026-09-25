@@ -165,6 +165,35 @@ func TestWebSearchEnvOverride(t *testing.T) {
 	}
 }
 
+func TestRepoMapConfig(t *testing.T) {
+	def := Default()
+	if def.Agent.RepoMap == nil || !*def.Agent.RepoMap {
+		t.Fatal("repo_map should default on")
+	}
+	if !def.RepoMapEnabled() {
+		t.Fatal("RepoMapEnabled should be true by default")
+	}
+	if def.Agent.RepoMapTokens != 1500 {
+		t.Fatalf("default repo_map_tokens = %d, want 1500", def.Agent.RepoMapTokens)
+	}
+
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	content := "provider:\n  type: fake\nagent:\n  repo_map: false\n  repo_map_tokens: 800\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RepoMapEnabled() {
+		t.Fatal("repo_map should be disabled from yaml")
+	}
+	if cfg.Agent.RepoMapTokens != 800 {
+		t.Fatalf("repo_map_tokens = %d, want 800", cfg.Agent.RepoMapTokens)
+	}
+}
+
 func TestReflectionConfig(t *testing.T) {
 	// Default: off, max reflections normalized to 2.
 	def := Default()

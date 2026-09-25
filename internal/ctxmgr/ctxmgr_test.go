@@ -316,6 +316,33 @@ func TestSnapshotSummary(t *testing.T) {
 	}
 }
 
+func TestRepoMapIncluded(t *testing.T) {
+	m := New("SYS", "", 10000)
+	m.SetRepoMap("Repository map:\nmain.go [go pkg main, 3 lines]\n  func main()")
+	m.AppendUser("hi")
+
+	req, snap := m.BuildRequest(nil)
+	found := false
+	for _, it := range snap.Items {
+		if it.Source != SourceRepoMap {
+			continue
+		}
+		found = true
+		if !it.Included || it.Excluded {
+			t.Fatalf("repo_map should be included: %+v", it)
+		}
+		if !it.Pinned {
+			t.Fatalf("repo_map should be pinned: %+v", it)
+		}
+	}
+	if !found {
+		t.Fatalf("missing repo_map item: %+v", snap.Items)
+	}
+	if req.Messages[0].Role != llm.RoleSystem || !strings.Contains(req.Messages[0].Content, "Repository map") {
+		t.Fatalf("repo_map not in system message: %+v", req.Messages[0])
+	}
+}
+
 func TestAppendReflectionSource(t *testing.T) {
 	m := New("SYS", "", 10000)
 	m.AppendUser("do the task")

@@ -54,6 +54,9 @@ const (
 	EventSkillUnloaded     EventType = "skill.unloaded"
 	EventMemoryRetrieved   EventType = "memory.retrieved"
 	EventMemoryUpdated     EventType = "memory.updated"
+	// EventRepoMapBuilt is emitted when a repository map is built for context
+	// (startup injection) or on demand (repo_map tool).
+	EventRepoMapBuilt EventType = "repo_map.built"
 
 	EventPlanCreated      EventType = "plan.created"
 	EventPlanApproved     EventType = "plan.approved"
@@ -322,6 +325,21 @@ type SkillEventData struct {
 	Bytes   int    `json:"bytes,omitempty"`
 	Summary string `json:"summary,omitempty"`
 	Reason  string `json:"reason,omitempty"` // e.g. "user command"
+}
+
+// RepoMapData is payload for repo_map.built.
+type RepoMapData struct {
+	Root      string `json:"root,omitempty"`
+	Subpath   string `json:"subpath,omitempty"`
+	Focus     string `json:"focus,omitempty"`
+	Files     int    `json:"files,omitempty"`
+	Scanned   int    `json:"scanned,omitempty"`
+	Skipped   int    `json:"skipped,omitempty"`
+	Symbols   int    `json:"symbols,omitempty"`
+	Tokens    int    `json:"tokens,omitempty"`
+	BuildMS   int64  `json:"build_ms,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
+	Reason    string `json:"reason,omitempty"` // startup | agent tool | user command
 }
 
 // MemoryEventData is payload for memory.retrieved / memory.updated.

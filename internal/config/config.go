@@ -57,6 +57,11 @@ type AgentConfig struct {
 	Reflection *bool `yaml:"reflection"`
 	// MaxReflections caps self-critique retries per turn (0 = default 2).
 	MaxReflections int `yaml:"max_reflections"`
+	// RepoMap injects a compact repository map (paths + Go top-level symbols)
+	// as pinned context to improve navigation. On by default.
+	RepoMap *bool `yaml:"repo_map"`
+	// RepoMapTokens caps the injected map size in estimated tokens (0 = default 1500).
+	RepoMapTokens int `yaml:"repo_map_tokens"`
 }
 
 // MemoryConfig controls cross-session MEMORY.md behavior.
@@ -99,6 +104,8 @@ func Default() Config {
 			MaxParallel:    4,
 			Reflection:     &off,
 			MaxReflections: 2,
+			RepoMap:        &on,
+			RepoMapTokens:  1500,
 		},
 		Data: DataConfig{
 			Location: "global",
@@ -110,6 +117,7 @@ func Default() Config {
 const DefaultSystemPrompt = `You are Min Code Agent, a coding assistant working inside a workspace.
 
 You have tools to explore and modify the repository:
+- repo_map: compact structural map (paths + Go top-level symbols); use it to orient before reading
 - list_dir / glob / grep / read_file: inspect code
 - write_file / edit_file: create or modify files (requires user approval)
 - shell: run commands (go test, git status allow; destructive commands denied)
@@ -134,6 +142,14 @@ func (c Config) StreamEnabled() bool {
 		return true
 	}
 	return *c.Provider.Stream
+}
+
+// RepoMapEnabled reports whether the repository map is injected into context.
+func (c Config) RepoMapEnabled() bool {
+	if c.Agent.RepoMap == nil {
+		return true
+	}
+	return *c.Agent.RepoMap
 }
 
 // PlatformShellHint returns OS-specific shell guidance for the system prompt.

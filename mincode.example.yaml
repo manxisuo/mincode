@@ -99,6 +99,19 @@ agent:
   # 单回合最多自省次数（达到上限后接受当前回答，避免死循环）。默认: 2
   max_reflections: 2
 
+  # Repository Map：把工作区结构（文件路径 + Go 顶层符号）作为 pinned 上下文
+  # 注入，帮助模型先定位再读取，减少盲目 glob/grep/read。启动时构建一次，
+  # 模型也可调用 repo_map 工具按子目录/关键词刷新。
+  # 事件: repo_map.built（files/symbols/tokens/truncated/build_ms）。
+  #   true  — 默认启用
+  #   false — 不注入，且不注册 repo_map 工具
+  # 默认: true
+  repo_map: true
+
+  # 注入的 Repository Map 预算（估算 token，超预算按结构相关度截断）。
+  # 默认: 1500
+  repo_map_tokens: 1500
+
   # 自定义 System Prompt。留空则使用内置 DefaultSystemPrompt
   #（并会附加平台相关 shell 提示：Windows/cmd vs Unix/sh）。
   # 填写后将**完全替换**内置提示词，需要时请自行写全工具与安全说明。

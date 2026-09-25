@@ -58,6 +58,7 @@ func NewDefaultPolicy() *DefaultPolicy {
 			"list_dir":   Allow,
 			"glob":       Allow,
 			"grep":       Allow,
+			"repo_map":   Allow, // read-only structural map of the workspace
 			"web_search": Allow, // read-only network query; backend must be configured
 			"web_fetch":  Allow, // read-only URL fetch; SSRF guard blocks private targets
 			"write_file": Ask,

@@ -28,6 +28,7 @@ import (
 	"github.com/manxisuo/mincode/internal/observability"
 	"github.com/manxisuo/mincode/internal/paths"
 	"github.com/manxisuo/mincode/internal/plan"
+	"github.com/manxisuo/mincode/internal/repomap"
 	"github.com/manxisuo/mincode/internal/session"
 	"github.com/manxisuo/mincode/internal/skill"
 	"github.com/manxisuo/mincode/internal/tools"
@@ -61,6 +62,7 @@ type App struct {
 	skills     *skill.Loader
 	mem        *memory.Store
 	plans      *plan.Manager
+	repoMap    *repomap.Map
 	lastResult *agent.Result
 	out        io.Writer
 	echoTools  atomic.Bool
@@ -158,6 +160,10 @@ func NewApp(opts Options) (*App, error) {
 		})
 	}
 
+	if cfg.RepoMapEnabled() {
+		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens})
+	}
+
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
 	ag := agent.NewWithCompress(provider, registry, bus, sessionID, cfg.Agent.MaxSteps, sysPrompt, cfg.Agent.TokenBudget, cfg.Agent.CompressAt)
 	if cfg.Agent.ParallelTools != nil {
@@ -249,6 +255,7 @@ func NewApp(opts Options) (*App, error) {
 
 	app.loadRootInstructions()
 	app.loadMemory()
+	app.loadRepoMap()
 	return app, nil
 }
 
@@ -394,6 +401,43 @@ func (a *App) loadMemory() {
 		Entries: countMemoryBullets(content),
 		Reason:  "startup",
 	})
+}
+
+// loadRepoMap builds a compact repository map and pins it into context.
+func (a *App) loadRepoMap() {
+	if !a.cfg.RepoMapEnabled() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	m, err := repomap.Build(ctx, a.workspace, repomap.Options{MaxTokens: a.cfg.Agent.RepoMapTokens})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "mincode: repo map: %v\n", err)
+		return
+	}
+	a.repoMap = m
+	a.agent.Ctx.SetRepoMap(m.Text)
+	a.emit(observability.EventRepoMapBuilt, observability.RepoMapData{
+		Root:      m.Root,
+		Subpath:   m.Subpath,
+		Focus:     m.Focus,
+		Files:     len(m.Files),
+		Scanned:   m.Scanned,
+		Skipped:   m.Skipped,
+		Symbols:   countRepoMapSymbols(m),
+		Tokens:    m.Tokens,
+		BuildMS:   m.BuildMS,
+		Truncated: m.Truncated,
+		Reason:    "startup",
+	})
+}
+
+func countRepoMapSymbols(m *repomap.Map) int {
+	n := 0
+	for _, f := range m.Files {
+		n += len(f.Symbols)
+	}
+	return n
 }
 
 func countMemoryBullets(content string) int {
@@ -568,6 +612,9 @@ func (a *App) repl(ctx context.Context) error {
 	if a.mem != nil && a.mem.Exists() {
 		fmt.Fprintf(a.out, "%s\n", bannerLine("memory", memory.FileName+" loaded"))
 	}
+	if a.repoMap != nil {
+		fmt.Fprintf(a.out, "%s\n", bannerLine("repo map", fmt.Sprintf("%d files, ~%d tokens", len(a.repoMap.Files), a.repoMap.Tokens)))
+	}
 	fmt.Fprintf(a.out, "Type a message, or %s for commands.\n\n", bold("/help"))
 
 	a.emit(observability.EventAgentStarted, observability.AgentLifecycleData{Reason: "repl"})
@@ -645,7 +692,7 @@ func newStdinScanner() *bufio.Scanner {
 }
 
 func (a *App) toolNames() []string {
-	return []string{"read_file", "list_dir", "glob", "grep", "write_file", "edit_file", "shell", "memory_add"}
+	return []string{"read_file", "list_dir", "glob", "grep", "repo_map", "write_file", "edit_file", "shell", "memory_add"}
 }
 
 // reportTurnError prints a user-facing message for a failed/cancelled turn.
@@ -857,6 +904,7 @@ func (a *App) handleCommand(ctx context.Context, line string) (quit bool) {
   /skill <name>      activate a skill (or /skill -<name> to deactivate)
   /memory            show project memory (MEMORY.md)
   /memory add <fact> append a durable fact to MEMORY.md
+  /repomap           show the repository map injected into context
   /export [path]     export conversation as Markdown (default: exports/<session-id>.md)
   /plan <goal>       draft a plan for a task
   /plan              show current plan
@@ -884,6 +932,8 @@ Trace file:
 		a.handleSkillCommand(fields[1:])
 	case "/memory":
 		a.handleMemoryCommand(fields[1:])
+	case "/repomap":
+		a.printRepoMap()
 	case "/export":
 		a.handleExportCommand(fields[1:])
 	case "/plan":
@@ -1132,6 +1182,26 @@ func (a *App) printMemory() {
 	}
 	fmt.Fprintf(a.out, "%s  %s\n\n", bold("Project Memory"), gray(a.mem.Path()))
 	fmt.Fprintln(a.out, content)
+	fmt.Fprintln(a.out)
+}
+
+// printRepoMap shows the repository map currently pinned into context.
+func (a *App) printRepoMap() {
+	fmt.Fprintln(a.out)
+	if a.repoMap == nil {
+		fmt.Fprintf(a.out, "%s — enable with %s (agent.repo_map)\n\n",
+			yellow("repository map disabled or not built"), bold("true"))
+		return
+	}
+	m := a.repoMap
+	trunc := ""
+	if m.Truncated {
+		trunc = "  " + yellow("(truncated)")
+	}
+	fmt.Fprintf(a.out, "%s  %s%s\n\n", bold("Repository Map"),
+		gray(fmt.Sprintf("%d files, %d symbols, ~%d tokens, scanned %d, %dms",
+			len(m.Files), countRepoMapSymbols(m), m.Tokens, m.Scanned, m.BuildMS)), trunc)
+	fmt.Fprintln(a.out, m.Text)
 	fmt.Fprintln(a.out)
 }
 

@@ -55,6 +55,8 @@ func Resolve(path, workspace string, envGet func(string) string, cli map[string]
 		{"agent.max_steps", nil, func() string { return itoa(base.Agent.MaxSteps) }, func() string { return "30" }, false},
 		{"agent.token_budget", nil, func() string { return itoa(base.Agent.TokenBudget) }, func() string { return "32000" }, false},
 		{"agent.compress_at", nil, func() string { return itoa(base.Agent.CompressAt) }, func() string { return "18000" }, false},
+		{"agent.repo_map", nil, func() string { return boolStr(base.Agent.RepoMap) }, func() string { return "true" }, false},
+		{"agent.repo_map_tokens", nil, func() string { return itoa(base.Agent.RepoMapTokens) }, func() string { return "1500" }, false},
 		{"websearch.type", []string{"MINCODE_WEBSEARCH_TYPE"}, func() string { return base.WebSearch.Type }, func() string { return "" }, false},
 		{"websearch.api_key", []string{"MINCODE_WEBSEARCH_API_KEY"}, func() string { return "" }, func() string { return "" }, true},
 		{"websearch.base_url", []string{"MINCODE_WEBSEARCH_BASE_URL"}, func() string { return "" }, func() string { return "" }, false},
@@ -167,6 +169,13 @@ func maskSecret(s string) string {
 		return "****"
 	}
 	return s[:2] + "…" + s[len(s)-2:]
+}
+
+func boolStr(v *bool) string {
+	if v != nil && !*v {
+		return "false"
+	}
+	return "true"
 }
 
 func itoa(n int) string {

@@ -33,6 +33,7 @@ type Manager struct {
 	instructions string
 	skills       string
 	memory       string
+	repoMap      string
 	budget       int
 	compressAt   int
 	entries      []entry
@@ -112,6 +113,8 @@ func (m *Manager) SetSkills(s string)       { m.skills = s }
 func (m *Manager) Skills() string           { return m.skills }
 func (m *Manager) SetMemory(s string)       { m.memory = s }
 func (m *Manager) Memory() string           { return m.memory }
+func (m *Manager) SetRepoMap(s string)      { m.repoMap = s }
+func (m *Manager) RepoMap() string          { return m.repoMap }
 func (m *Manager) System() string           { return m.system }
 func (m *Manager) SetSystem(s string)       { m.system = s }
 func (m *Manager) Len() int                 { return len(m.entries) }
@@ -353,6 +356,15 @@ func (m *Manager) BuildRequest(tools []llm.ToolDefinition) (llm.ChatRequest, Sna
 			tok:   m.est(m.memory),
 			pin:   true,
 			order: 8200,
+		})
+	}
+	if trimSpace(m.repoMap) != "" {
+		parts = append(parts, part{
+			msg:   llm.Message{Role: llm.RoleSystem, Content: m.repoMap},
+			src:   SourceRepoMap,
+			tok:   m.est(m.repoMap),
+			pin:   true,
+			order: 8100,
 		})
 	}
 	for i, e := range m.entries {

@@ -144,6 +144,13 @@ func normalize(cfg *Config) {
 	if cfg.Agent.MaxReflections <= 0 {
 		cfg.Agent.MaxReflections = 2
 	}
+	if cfg.Agent.RepoMap == nil {
+		on := true
+		cfg.Agent.RepoMap = &on
+	}
+	if cfg.Agent.RepoMapTokens <= 0 {
+		cfg.Agent.RepoMapTokens = 1500
+	}
 	if cfg.Data.Location == "" {
 		cfg.Data.Location = "global"
 	}

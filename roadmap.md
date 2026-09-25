@@ -1,7 +1,7 @@
 # Roadmap
 
 > **状态：Phase 0–12 已全部完成**（含 Hardening 修复、MVP 验收测试、Experiment 分布统计）。
-> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection** 均已落地。
+> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection**、**Repository Map** 均已落地。
 
 ## 总体原则
 
@@ -408,7 +408,7 @@ Failures
 
 ```text
 Parallel Tool Calls     ✅ 已实现（Phase 13）
-Repository Map
+Repository Map          ✅ 已实现（启动注入 + repo_map 工具）
 Semantic Code Search
 RAG
 Context Caching
@@ -633,6 +633,55 @@ websearch:
 
 ```text
 浏览器渲染（不执行 JS；纯 JS 渲染的页面可能取不到正文）
+```
+
+---
+
+## Repository Map（已实现）
+
+### 目标
+
+让 Agent 先看到仓库的紧凑结构（文件 + 顶层符号），再决定读哪些文件，
+从而改善代码导航并降低 context 浪费（少做盲目 glob/grep/read）。
+
+### 实现
+
+```text
+internal/repomap   Build(ctx, workspace, Options) → ranked + budgeted Map
+  Go 文件: 标准库 go/ast 提取 func / method / type / struct / interface / const / var
+  其他语言: 仅列路径 + 语言（不引第三方解析器）
+  排名: 导出符号权重 + 跨文件引用计数（轻量中心度）+ 路径/符号 focus 加权
+  预算: MaxTokens 截断；跳过 vendor/node_modules/.git/.mincode/dist 等与生成文件
+```
+
+- **启动注入**：`agent.repo_map`（默认 true）构建一次，作为 pinned system
+  context（`source=repo_map`），预算 `agent.repo_map_tokens`（默认 1500）。
+- **repo_map 工具**：只读、可并行；参数 `path`（限定子目录）、`focus`
+  （加权关键词）、`max_tokens`（硬上限 4000），用于按需刷新子图。
+- `/repomap` 命令查看当前注入的 map 与统计。
+
+### 可观测
+
+```text
+repo_map.built（root/subpath/focus/files/scanned/skipped/symbols/tokens/build_ms/truncated/reason）
+Context snapshot: source=repo_map（pinned）
+启动 reason=startup；工具调用 reason=agent tool
+```
+
+### 配置
+
+```yaml
+agent:
+  repo_map: true
+  repo_map_tokens: 1500
+```
+
+### 明确不做（第一版）
+
+```text
+tree-sitter / 多语言精确符号（非 Go 仅列路径）
+语义 / embedding 排序（后续 Semantic Code Search）
+持续增量缓存（每次构建都重新扫描，受 scanCap 与 5s 超时约束）
 ```
 
 ---

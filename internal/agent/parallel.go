@@ -23,6 +23,7 @@ var parallelSafeTools = map[string]bool{
 	"list_dir":   true,
 	"glob":       true,
 	"grep":       true,
+	"repo_map":   true,
 	"web_search": true,
 	"web_fetch":  true,
 }
@@ -375,6 +376,7 @@ func (a *Agent) finishToolCall(p preparedCall, result tools.Result, dur time.Dur
 	}
 
 	a.loadInstructionsForTool(p.call, result)
+	a.emitRepoMapFromTool(p.call.Name, result)
 
 	preview := result.Content
 	if len(preview) > toolPreviewLen {

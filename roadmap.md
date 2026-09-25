@@ -1,7 +1,7 @@
 # Roadmap
 
 > **状态：Phase 0–12 已全部完成**（含 Hardening 修复、MVP 验收测试、Experiment 分布统计）。
-> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）** 均已落地。
+> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch** 均已落地。
 
 ## 总体原则
 
@@ -417,10 +417,12 @@ Sub-Agent
 MCP
 Long-term Memory
 Adaptive Tool Selection
-Plan-and-Execute       ✅ 已实现（/auto 命令 + 自动重规划）
+Plan-and-Execute       ✅ 已实现（/plan auto 命令 + 失败重规划）
 Local Web Inspector     ✅ W1 已实现（HTTP/SSE + web/）
 LLM Streaming Output    ✅ 已实现（SSE 增量 + TTFT + CLI/Web 展示）
 Transparency Deepening  ✅ 已实现（T-obs-1~7）
+Web Search              ✅ 已实现（Provider: fake / Tavily / SearxNG + web_search 工具）
+Web Fetch               ✅ 已实现（web_fetch 工具 + SSRF 防护）
 ```
 
 任何新增能力都必须同步设计对应可观测能力。
@@ -587,6 +589,50 @@ Timeline: Batch Start / Batch Done
 agent:
   parallel_tools: true
   max_parallel: 4
+```
+
+---
+
+## Web Search / Web Fetch（已实现）
+
+### 目标
+
+让 Agent 能获取工作区之外的信息：先「发现 URL」，再「读取正文」。
+
+### 实现
+
+```text
+internal/websearch   Provider 接口（Search）+ FakeProvider + HTTPProvider(Tavily) + SearxNGProvider
+internal/webfetch    Fetcher 接口（Fetch）+ HTTPFetcher + FakeFetcher
+tools                web_search / web_fetch
+```
+
+- **web_search**：默认关闭，配置后置才注册
+  - `fake`（离线）/ `tavily`（商业 API）/ `searxng`（自托管）
+  - 结果条数 / snippet / 总输出均限长；结果视为不可信内容
+- **web_fetch**：无需配置，始终注册
+  - 纯标准库；HTML→文本（去 script/style/注释，提取标题）；5 MiB 读取上限；最多 5 次重定向
+  - SSRF 防护：按实际连接 IP 拦截 loopback / private / link-local / CGNAT，仅允许 http(s)，禁用代理
+
+### 可观测
+
+```text
+复用 tool.requested / tool.started / tool.finished
+Meta: query / count / duration_ms（search）；url / final_url / status / title / bytes（fetch）
+```
+
+### 配置
+
+```yaml
+websearch:
+  type: ""          # "" 禁用 | fake | tavily | searxng
+  # base_url / api_key / max_results / timeout_sec
+```
+
+### 明确不做
+
+```text
+浏览器渲染（不执行 JS；纯 JS 渲染的页面可能取不到正文）
 ```
 
 ---

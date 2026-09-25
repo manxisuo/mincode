@@ -81,6 +81,7 @@ Tools:
   read_file / list_dir / glob / grep
   write_file / edit_file / shell
   memory_add
+  web_search（需配置后端） / web_fetch（抓取 URL 正文）
 
 Parallel Tool Calls（连续只读工具并行；写/Shell 保持串行）
 
@@ -208,6 +209,42 @@ mincode experiment compare model-a model-b
 ```
 
 结果写入实验存储目录（global 布局为 `{home}/.mincode/projects/<project-id>/experiments/`，或 `data.location: workspace` 时为 `<workspace>/.mincode/experiments/`）。对比时优先看 **median**（均值易被 outlier 拉偏）。
+
+## 启用 Web 搜索
+
+`web_search`（搜索并返回标题 / 链接 / 摘要）默认关闭，**需配置一个后端才会注册**；`web_fetch`（抓取指定 URL 正文）无需配置，始终可用。
+
+### 方式 A：自托管 SearxNG（免费）
+
+1. 用 Docker 起一个 SearxNG，并在其实例 `settings.yml` 的 `search.formats` 中加入 `json`
+2. 配置 mincode：
+
+```yaml
+websearch:
+  type: searxng
+  base_url: http://localhost:8888
+```
+
+3. 验证后端：`curl "http://localhost:8888/search?q=test&format=json"` 能返回 `results`
+
+### 方式 B：Tavily（商业 API）
+
+```bash
+export MINCODE_WEBSEARCH_API_KEY=tvly-...
+```
+
+```yaml
+websearch:
+  type: tavily
+```
+
+### 冒烟测试（离线，不联网）
+
+```bash
+MINCODE_WEBSEARCH_TYPE=fake mincode -p "用 web_search 搜索 test"
+```
+
+> 相关环境变量：`MINCODE_WEBSEARCH_TYPE` / `MINCODE_WEBSEARCH_API_KEY` / `MINCODE_WEBSEARCH_BASE_URL`。完整字段见 `mincode.example.yaml` 的 `websearch` 段。
 
 ## 典型执行流程
 

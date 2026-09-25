@@ -11,8 +11,12 @@ type Config struct {
 
 // WebSearchConfig selects and configures the web search backend.
 type WebSearchConfig struct {
-	// Type is "fake" (offline demo) or "" (disabled).
+	// Type is "fake" (offline demo), "tavily" (HTTP), or "" (disabled).
 	Type string `yaml:"type"`
+	// APIKey authenticates the search backend (prefer MINCODE_WEBSEARCH_API_KEY).
+	APIKey string `yaml:"api_key"`
+	// BaseURL overrides the backend endpoint. Empty uses the provider default.
+	BaseURL string `yaml:"base_url"`
 	// MaxResults is the tool default when the model omits one (0 = tool default 5).
 	MaxResults int `yaml:"max_results"`
 	// TimeoutSec is the per-search timeout in seconds (0 = tool default 20).

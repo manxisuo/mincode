@@ -83,6 +83,12 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("MINCODE_WEBSEARCH_TYPE"); v != "" {
 		cfg.WebSearch.Type = v
 	}
+	if v := os.Getenv("MINCODE_WEBSEARCH_API_KEY"); v != "" {
+		cfg.WebSearch.APIKey = v
+	}
+	if v := os.Getenv("MINCODE_WEBSEARCH_BASE_URL"); v != "" {
+		cfg.WebSearch.BaseURL = v
+	}
 }
 
 func firstEnv(keys ...string) string {

@@ -239,6 +239,19 @@ func TestBuildWebSearch(t *testing.T) {
 	if p.Name() != "fake" {
 		t.Fatalf("name = %q", p.Name())
 	}
+
+	// tavily requires an api key.
+	if _, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "tavily"}}); err == nil {
+		t.Fatal("tavily without api_key should error")
+	}
+	tp, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "tavily", APIKey: "tvly-x"}})
+	if err != nil || tp == nil {
+		t.Fatalf("tavily: provider=%v err=%v", tp, err)
+	}
+	if tp.Name() != "tavily" {
+		t.Fatalf("name = %q", tp.Name())
+	}
+
 	if _, err := buildWebSearch(config.Config{WebSearch: config.WebSearchConfig{Type: "bogus"}}); err == nil {
 		t.Fatal("unknown type should error")
 	}

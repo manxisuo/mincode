@@ -50,6 +50,7 @@ type Usage struct {
 var (
 	ErrEmptyQuery = errors.New("websearch: empty query")
 	ErrNoResult   = errors.New("websearch: no results")
+	ErrNoAPIKey   = errors.New("websearch: api key not configured")
 )
 
 // ProviderError wraps a search-backend failure with context.

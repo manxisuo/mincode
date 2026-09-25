@@ -128,11 +128,21 @@ memory:
 # ---------------------------------------------------------------------------
 websearch:
   # 搜索后端类型。
-  #   ""     — 禁用（不注册 web_search 工具）
-  #   fake   — 离线脚本结果，测试 / 演示用，不访问网络
+  #   ""       — 禁用（不注册 web_search 工具）
+  #   fake     — 离线脚本结果，测试 / 演示用，不访问网络
+  #   tavily   — 真实 HTTP 搜索（Tavily /search API）
   # ENV: MINCODE_WEBSEARCH_TYPE
   # 默认: ""（禁用）
   type: ""
+
+  # API Key（type=tavily 时必填）。建议改用环境变量 MINCODE_WEBSEARCH_API_KEY。
+  # 默认: 空
+  # api_key: tvly-...
+
+  # 后端根地址覆盖（type=tavily 时可选）。留空使用默认 https://api.tavily.com。
+  # ENV: MINCODE_WEBSEARCH_BASE_URL
+  # 默认: 空（provider 默认值）
+  # base_url: https://api.tavily.com
 
   # 每次搜索返回条数的默认上限（模型可用 max_results 覆盖，硬上限 10）。
   # 0 表示使用工具默认 5。

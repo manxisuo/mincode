@@ -268,6 +268,7 @@ func buildProvider(cfg config.Config) (llm.Provider, error) {
 
 // buildWebSearch builds the web search backend from config, or nil when disabled.
 func buildWebSearch(cfg config.Config) (websearch.Provider, error) {
+	timeout := time.Duration(cfg.WebSearch.TimeoutSec) * time.Second
 	switch cfg.WebSearch.Type {
 	case "":
 		return nil, nil
@@ -277,6 +278,11 @@ func buildWebSearch(cfg config.Config) (websearch.Provider, error) {
 				{Title: "Fake web result", URL: "https://example.com/fake", Snippet: "Offline fake web search result."},
 			},
 		}), nil
+	case "tavily":
+		if strings.TrimSpace(cfg.WebSearch.APIKey) == "" {
+			return nil, fmt.Errorf("websearch type %q requires api_key (or MINCODE_WEBSEARCH_API_KEY)", cfg.WebSearch.Type)
+		}
+		return websearch.NewHTTPProvider(cfg.WebSearch.BaseURL, cfg.WebSearch.APIKey, timeout), nil
 	default:
 		return nil, fmt.Errorf("unknown websearch type %q", cfg.WebSearch.Type)
 	}

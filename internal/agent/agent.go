@@ -32,12 +32,14 @@ const (
 )
 
 // reflectionInstruction is appended as a user message for a self-critique pass.
-const reflectionInstruction = `Review your work above for the user's task.
-Check: did you fully address it? Any factual errors, missing steps, or unverified claims?
-If you changed code, was it validated (e.g., tests run)?
+// It is deliberately scoped to the latest answer so the model does not drag in
+// earlier turns, and it defers to the user's formatting constraints.
+const reflectionInstruction = `Review ONLY the final answer you just gave for the user's latest request (the immediately preceding assistant message).
+Do not re-answer, redo, or comment on any earlier turns.
+Respect the user's formatting constraints (e.g. output-only requests) — do not add commentary unless asked.
 Reply with EXACTLY one of:
-- "VERDICT: DONE"
-- "VERDICT: CONTINUE" followed by a numbered list of concrete issues to fix.
+- "VERDICT: DONE" — that answer is correct and fully addresses the latest request.
+- "VERDICT: CONTINUE" followed by a numbered list of concrete issues with that answer.
 No other prose.`
 
 // truncatePreview cuts s to at most max bytes on a UTF-8 rune boundary.
@@ -273,8 +275,10 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 				Content: resp.Content,
 			})
 
-			// Bounded self-critique before finalizing.
-			if a.Reflection && reflections < a.maxReflections() {
+			// Bounded self-critique before finalizing. Only when the turn did
+			// real work (used tools): self-review of pure chat/creative answers
+			// adds cost and can drag earlier turns back in.
+			if a.Reflection && toolCalls > 0 && reflections < a.maxReflections() {
 				reflections++
 				keepGoing, critique, rerr := a.reflect(ctx, req, resp.Content, reflections)
 				switch {

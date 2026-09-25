@@ -89,8 +89,9 @@ agent:
   # 并行只读工具的并发上限。默认: 4
   max_parallel: 4
 
-  # 自省（Reflection）：最终回答前让模型自审一次，发现问题则继续迭代。
-  # 开启后每个完成的回合会多一次 LLM 调用。
+  # 自省（Reflection）：**用过工具的回合**在最终回答前自审一次，
+  # 发现问题则继续迭代。纯对话 / 创作类回合（未用工具）不触发，避免干扰
+  # 严格格式输出、也省一次调用。
   # 事件: reflection.started / reflection.finished（含 verdict/issue_count）。
   # 默认: false
   reflection: false

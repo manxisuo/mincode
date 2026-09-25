@@ -417,8 +417,6 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 	}
 
 	a.loadInstructionsForTool(tc, result)
-	// Called after AppendToolResult so the meta sticks to the tool_result entry.
-	a.Ctx.SetMeta(tc.Name, tc.Name, metaPath, "", a.Ctx.LastStep())
 
 	preview := result.Content
 	if len(preview) > toolPreviewLen {
@@ -689,13 +687,6 @@ func (a *Agent) emitWireRequest(req llm.ChatRequest) {
 			DescriptionLen: t.DescriptionLen,
 		})
 	}
-	step := data.SnapshotTotalTokens // placeholder avoid unused; step from snapshot
-	if a.Ctx != nil {
-		if snap := a.Ctx.LastSnapshot(); snap != nil {
-			step = snap.Step
-		}
-	}
-	_ = step
 	a.emit(observability.EventLLMWireRequest, data)
 }
 

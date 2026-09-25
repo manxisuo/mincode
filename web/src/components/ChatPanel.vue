@@ -50,6 +50,7 @@ function clock(iso?: string): string {
         :value="input"
         :disabled="disabled"
         @input="emit('update:input', ($event.target as HTMLTextAreaElement).value)"
+        @keydown.enter.exact.prevent="onSubmit"
       />
       <button class="primary" type="submit" :disabled="disabled">{{ t("chat.send") }}</button>
     </form>

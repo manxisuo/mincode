@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -65,9 +65,30 @@ function formatVal(v: unknown): string {
 }
 
 const outputLines = computed(() => {
+  if (fullText.value) return fullText.value;
   const s = props.detail?.outputPreview || props.detail?.error || "";
   return s;
 });
+
+const fullText = ref("");
+const loadingFull = ref(false);
+
+async function loadFull() {
+  const id = props.detail?.callId;
+  if (!id) return;
+  loadingFull.value = true;
+  try {
+    const res = await fetch(
+      "/api/tools/result?call_id=" + encodeURIComponent(id),
+    );
+    const data = (await res.json()) as { content?: string; error?: string };
+    fullText.value = data.content || data.error || "";
+  } catch (e) {
+    fullText.value = "load failed: " + String(e);
+  } finally {
+    loadingFull.value = false;
+  }
+}
 </script>
 
 <template>
@@ -113,6 +134,16 @@ const outputLines = computed(() => {
 
       <div class="dl-subhead">
         {{ detail.isError || detail.type === "tool.failed" ? t("toolModal.error") : t("toolModal.result") }}
+        <button
+          v-if="detail.callId && !fullText"
+          type="button"
+          class="linkish"
+          :disabled="loadingFull"
+          style="margin-left: 8px"
+          @click="loadFull()"
+        >
+          {{ loadingFull ? "…" : t("toolModal.loadFull") }}
+        </button>
       </div>
       <pre
         class="tool-out"

@@ -427,6 +427,7 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 	data := observability.ToolEventData{
 		Tool:          tc.Name,
 		Arguments:     args,
+		CallID:        tc.ID,
 		DurationMS:    elapsed.Milliseconds(),
 		ResultSize:    len(result.Content),
 		IsError:       result.IsError,

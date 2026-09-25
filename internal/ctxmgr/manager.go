@@ -215,6 +215,20 @@ func (m *Manager) AppendToolResult(toolCallID, content string) {
 	})
 }
 
+// ToolResultByCallID returns the full tool result content for a call_id (T-obs-6).
+func (m *Manager) ToolResultByCallID(callID string) (string, bool) {
+	if m == nil || callID == "" {
+		return "", false
+	}
+	for i := len(m.entries) - 1; i >= 0; i-- {
+		e := &m.entries[i]
+		if e.msg.ToolCallID == callID || e.callID == callID {
+			return e.msg.Content, true
+		}
+	}
+	return "", false
+}
+
 // ExportedEntry is a serializable conversation entry.
 type ExportedEntry struct {
 	Msg    llm.Message `json:"msg"`

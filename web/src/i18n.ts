@@ -158,6 +158,7 @@ const enUS = {
   "toolModal.trunc":
     "Event preview only ({a} / {b} chars); full result in Context snapshot or History JSON",
   "toolModal.title": "Tool call detail",
+  "toolModal.loadFull": "Load full text",
   "common.current": "current",
   "common.active": "active",
   "common.finished": "finished",
@@ -352,6 +353,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "toolModal.trunc":
     "事件里仅含预览（{a} / {b} 字符）；完整结果见 Context snapshot 或 History JSON",
   "toolModal.title": "工具调用详情",
+  "toolModal.loadFull": "加载全文",
   "common.current": "当前",
   "common.active": "已激活",
   "common.finished": "完成",

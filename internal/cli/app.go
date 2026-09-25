@@ -421,17 +421,19 @@ func (a *App) loadRepoMap() {
 	a.repoMap = m
 	a.agent.Ctx.SetRepoMap(m.Text)
 	a.emit(observability.EventRepoMapBuilt, observability.RepoMapData{
-		Root:      m.Root,
-		Subpath:   m.Subpath,
-		Focus:     m.Focus,
-		Files:     len(m.Files),
-		Scanned:   m.Scanned,
-		Skipped:   m.Skipped,
-		Symbols:   countRepoMapSymbols(m),
-		Tokens:    m.Tokens,
-		BuildMS:   m.BuildMS,
-		Truncated: m.Truncated,
-		Reason:    "startup",
+		Root:        m.Root,
+		Subpath:     m.Subpath,
+		Focus:       m.Focus,
+		Files:       len(m.Files),
+		Scanned:     m.Scanned,
+		Skipped:     m.Skipped,
+		Symbols:     countRepoMapSymbols(m),
+		Tokens:      m.Tokens,
+		BuildMS:     m.BuildMS,
+		Truncated:   m.Truncated,
+		Reason:      "startup",
+		CacheHits:   m.CacheHits,
+		CacheMisses: m.CacheMisses,
 	})
 }
 

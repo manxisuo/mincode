@@ -35,6 +35,7 @@ function isDeeplink(e: RuntimeEvent): boolean {
     t.startsWith("plan.") ||
     t.startsWith("permission.") ||
     t === "instruction.loaded" ||
+    t === "repo_map.built" ||
     t === "file.changed" ||
     t === "tool.started" ||
     t === "tool.finished" ||
@@ -50,6 +51,7 @@ function deeplinkTitle(e: RuntimeEvent): string | undefined {
   if (!isDeeplink(e)) return undefined;
   if (e.type.startsWith("permission.")) return "permission history";
   if (e.type === "instruction.loaded") return "Instructions";
+  if (e.type === "repo_map.built") return "Repo Map (ranking rationale)";
   if (e.type === "file.changed") return "Diff / path";
   if (e.type.startsWith("tool.")) return "tool call detail (args / result)";
   if (

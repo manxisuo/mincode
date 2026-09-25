@@ -76,6 +76,8 @@ const exportBusy = ref(false);
 const openSkillName = ref("");
 const planBump = ref(0);
 const openInstructionPath = ref("");
+const openRepoMapPath = ref("");
+const openRepoMapFocus = ref("");
 const permOpen = ref(false);
 const permFocus = ref<Record<string, unknown> | null>(null);
 const permEvents = ref<RuntimeEvent[]>([]);
@@ -194,6 +196,12 @@ function onTimelineDeepLink(
     const p = String(d.rel_path || d.path || "");
     openInstructionPath.value = p;
     view.value = "instructions";
+    return;
+  }
+  if (type === "repo_map.built") {
+    openRepoMapPath.value = String(d.subpath || "");
+    openRepoMapFocus.value = String(d.focus || "");
+    view.value = "repomap";
     return;
   }
   if (type === "file.changed") {
@@ -491,7 +499,11 @@ async function onSwitchSession(id: string) {
         :open-path="openInstructionPath"
       />
       <MemoryPanel v-else-if="view === 'memory'" />
-      <RepoMapPanel v-else-if="view === 'repomap'" />
+      <RepoMapPanel
+        v-else-if="view === 'repomap'"
+        :open-path="openRepoMapPath"
+        :open-focus="openRepoMapFocus"
+      />
       <SessionsPanel
         v-else-if="view === 'sessions'"
         :load-session="onSwitchSession"

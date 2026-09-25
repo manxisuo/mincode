@@ -340,6 +340,10 @@ type RepoMapData struct {
 	BuildMS   int64  `json:"build_ms,omitempty"`
 	Truncated bool   `json:"truncated,omitempty"`
 	Reason    string `json:"reason,omitempty"` // startup | agent tool | user command
+	// CacheHits / CacheMisses are the incremental-cache outcome for this build
+	// (reused unchanged files vs re-parsed files). Always emitted.
+	CacheHits   int `json:"cache_hits"`
+	CacheMisses int `json:"cache_misses"`
 }
 
 // MemoryEventData is payload for memory.retrieved / memory.updated.

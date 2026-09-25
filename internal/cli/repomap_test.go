@@ -28,14 +28,31 @@ func TestRepoMapInjectedIntoContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
+	found, sawMiss := false, false
 	for _, e := range events {
-		if e.Type == observability.EventRepoMapBuilt {
-			found = true
+		if e.Type != observability.EventRepoMapBuilt {
+			continue
+		}
+		found = true
+		data, ok := e.Data.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasHits := data["cache_hits"]; !hasHits {
+			t.Fatalf("repo_map.built missing cache_hits: %+v", data)
+		}
+		if _, hasMisses := data["cache_misses"]; !hasMisses {
+			t.Fatalf("repo_map.built missing cache_misses: %+v", data)
+		}
+		if misses, _ := data["cache_misses"].(float64); misses >= 1 {
+			sawMiss = true
 		}
 	}
 	if !found {
 		t.Fatal("missing repo_map.built startup event")
+	}
+	if !sawMiss {
+		t.Fatal("expected a repo_map.built event with cache_misses >= 1")
 	}
 }
 
@@ -65,6 +82,12 @@ func TestRepoMapToolEmitsEvent(t *testing.T) {
 			continue
 		}
 		if data, ok := e.Data.(map[string]any); ok {
+			if _, hasHits := data["cache_hits"]; !hasHits {
+				t.Fatalf("tool repo_map.built missing cache_hits: %+v", data)
+			}
+			if _, hasMisses := data["cache_misses"]; !hasMisses {
+				t.Fatalf("tool repo_map.built missing cache_misses: %+v", data)
+			}
 			if r, _ := data["reason"].(string); r == "agent tool" {
 				toolReason = true
 			}

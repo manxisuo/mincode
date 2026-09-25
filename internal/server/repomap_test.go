@@ -77,6 +77,9 @@ func TestRepoMapAPIEnabled(t *testing.T) {
 	if text, _ := first["text"].(string); text == "" {
 		t.Fatal("missing rendered text")
 	}
+	if misses, _ := first["cache_misses"].(float64); misses < 1 {
+		t.Fatalf("first build should report cache misses, got %v", first["cache_misses"])
+	}
 
 	// Second call reuses the shared incremental cache.
 	second := getJSON(t, ts.URL+"/api/repomap")

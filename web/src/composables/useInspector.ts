@@ -51,6 +51,14 @@ function previewData(data?: Record<string, unknown>): string {
   if (data.stage != null && data.message_count != null) {
     return `stage=${data.stage} msgs=${data.message_count} tools=${data.tool_count ?? 0} est=${data.estimated_prompt_tokens ?? "—"}`;
   }
+  if (data.files != null && data.tokens != null && data.build_ms != null) {
+    const hits = Number(data.cache_hits || 0);
+    const misses = Number(data.cache_misses || 0);
+    const cache = hits || misses ? ` · cache ${hits}/${hits + misses}` : "";
+    const trunc = data.truncated ? " · truncated" : "";
+    const reason = data.reason ? ` · ${data.reason}` : "";
+    return `${data.files} files ~${data.tokens}t · ${data.build_ms}ms${cache}${trunc}${reason}`;
+  }
   if (data.estimated_prompt_tokens != null && data.input_tokens != null) {
     return `est=${data.estimated_prompt_tokens} provider=${data.input_tokens} Δ=${data.prompt_token_delta ?? "?"}`;
   }

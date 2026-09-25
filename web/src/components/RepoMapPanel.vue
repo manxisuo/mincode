@@ -5,11 +5,19 @@ import { apiRepoMap, type RepoMapFile, type RepoMapResponse } from "../repoMapAp
 
 const { t } = useI18n();
 
+const props = withDefaults(
+  defineProps<{
+    openPath?: string;
+    openFocus?: string;
+  }>(),
+  { openPath: "", openFocus: "" },
+);
+
 const data = ref<RepoMapResponse | null>(null);
 const error = ref("");
 const loading = ref(false);
-const pathInput = ref("");
-const focusInput = ref("");
+const pathInput = ref(props.openPath);
+const focusInput = ref(props.openFocus);
 const expanded = ref<Set<string>>(new Set());
 const showText = ref(false);
 

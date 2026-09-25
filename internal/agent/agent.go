@@ -539,16 +539,18 @@ func (a *Agent) emitRepoMapFromTool(name string, result tools.Result) {
 	sub, _ := result.Meta["path"].(string)
 	focus, _ := result.Meta["focus"].(string)
 	a.emit(observability.EventRepoMapBuilt, observability.RepoMapData{
-		Subpath:   sub,
-		Focus:     focus,
-		Files:     metaInt(result.Meta["files"]),
-		Scanned:   metaInt(result.Meta["scanned"]),
-		Skipped:   metaInt(result.Meta["skipped"]),
-		Symbols:   metaInt(result.Meta["symbols"]),
-		Tokens:    metaInt(result.Meta["tokens"]),
-		BuildMS:   int64(metaInt(result.Meta["build_ms"])),
-		Truncated: metaBool(result.Meta["truncated"]),
-		Reason:    "agent tool",
+		Subpath:     sub,
+		Focus:       focus,
+		Files:       metaInt(result.Meta["files"]),
+		Scanned:     metaInt(result.Meta["scanned"]),
+		Skipped:     metaInt(result.Meta["skipped"]),
+		Symbols:     metaInt(result.Meta["symbols"]),
+		Tokens:      metaInt(result.Meta["tokens"]),
+		BuildMS:     int64(metaInt(result.Meta["build_ms"])),
+		Truncated:   metaBool(result.Meta["truncated"]),
+		Reason:      "agent tool",
+		CacheHits:   metaInt(result.Meta["cache_hits"]),
+		CacheMisses: metaInt(result.Meta["cache_misses"]),
 	})
 }
 

@@ -175,27 +175,6 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		ag.Ctx.SetMemory(memStore.Compose())
 	}
 
-	if cfg.RepoMapEnabled() {
-		buildCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if m, err := repomap.Build(buildCtx, workspace, repomap.Options{MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache}); err == nil {
-			ag.Ctx.SetRepoMap(m.Text)
-			bus.Publish(observability.NewEvent(sessionID, 0, observability.EventRepoMapBuilt,
-				observability.RepoMapData{
-					Files:     len(m.Files),
-					Symbols:   countRepoMapSymbols(m),
-					Tokens:    m.Tokens,
-					Scanned:   m.Scanned,
-					Skipped:   m.Skipped,
-					BuildMS:   m.BuildMS,
-					Truncated: m.Truncated,
-					Reason:    "startup",
-				}))
-		} else {
-			fmt.Fprintf(os.Stderr, "mincode web: repo map: %v\n", err)
-		}
-		cancel()
-	}
-
 	addr := w.Addr
 	if addr == "" {
 		addr = "127.0.0.1:8080"
@@ -228,6 +207,31 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	srv.SetMemory(memStore)
 	sessStore := session.NewStore(layout.SessionsDir)
 	srv.SetSessions(sessStore)
+
+	// Build the repo map after the server subscribes to the bus so this
+	// startup event reaches the live Timeline (and carries cache stats).
+	if cfg.RepoMapEnabled() {
+		buildCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if m, err := repomap.Build(buildCtx, workspace, repomap.Options{MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache}); err == nil {
+			ag.Ctx.SetRepoMap(m.Text)
+			bus.Publish(observability.NewEvent(sessionID, 0, observability.EventRepoMapBuilt,
+				observability.RepoMapData{
+					Files:       len(m.Files),
+					Symbols:     countRepoMapSymbols(m),
+					Tokens:      m.Tokens,
+					Scanned:     m.Scanned,
+					Skipped:     m.Skipped,
+					BuildMS:     m.BuildMS,
+					Truncated:   m.Truncated,
+					Reason:      "startup",
+					CacheHits:   m.CacheHits,
+					CacheMisses: m.CacheMisses,
+				}))
+		} else {
+			fmt.Fprintf(os.Stderr, "mincode web: repo map: %v\n", err)
+		}
+		cancel()
+	}
 
 	bus.Publish(observability.NewEvent(sessionID, 0, observability.EventSessionCreated,
 		observability.SessionCreatedData{

@@ -63,6 +63,7 @@ const (
 	EventPlanStepFinished EventType = "plan.step_finished"
 	EventPlanStepFailed   EventType = "plan.step_failed"
 	EventPlanFinished     EventType = "plan.finished"
+	EventPlanReplan       EventType = "plan.replan"
 
 	EventLoopDetected EventType = "loop.detected"
 	EventDecision     EventType = "decision.recorded"
@@ -330,14 +331,15 @@ type MemoryEventData struct {
 
 // PlanEventData is payload for plan.* lifecycle events.
 type PlanEventData struct {
-	PlanID    string `json:"plan_id"`
-	Goal      string `json:"goal,omitempty"`
-	Status    string `json:"status,omitempty"`
-	StepIndex int    `json:"step_index,omitempty"`
-	StepTitle string `json:"step_title,omitempty"`
-	StepCount int    `json:"step_count,omitempty"`
-	DoneCount int    `json:"done_count,omitempty"`
-	Result    string `json:"result,omitempty"`
-	Error     string `json:"error,omitempty"`
-	Reason    string `json:"reason,omitempty"`
+	PlanID      string `json:"plan_id"`
+	Goal        string `json:"goal,omitempty"`
+	Status      string `json:"status,omitempty"`
+	StepIndex   int    `json:"step_index,omitempty"`
+	StepTitle   string `json:"step_title,omitempty"`
+	StepCount   int    `json:"step_count,omitempty"`
+	DoneCount   int    `json:"done_count,omitempty"`
+	Result      string `json:"result,omitempty"`
+	Error       string `json:"error,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	ReplanCount int    `json:"replan_count,omitempty"`
 }

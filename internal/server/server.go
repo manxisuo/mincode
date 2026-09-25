@@ -129,6 +129,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/plan/approve", s.handlePlanApprove)
 	mux.HandleFunc("POST /api/plan/reject", s.handlePlanReject)
 	mux.HandleFunc("POST /api/plan/cancel", s.handlePlanCancel)
+	mux.HandleFunc("POST /api/plan/auto", s.handlePlanAuto)
 	mux.HandleFunc("GET /api/skills", s.handleSkillList)
 	mux.HandleFunc("GET /api/skills/{name}", s.handleSkillShow)
 	mux.HandleFunc("POST /api/skills/{name}/activate", s.handleSkillActivate)

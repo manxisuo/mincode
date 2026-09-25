@@ -43,6 +43,8 @@ type Plan struct {
 	CreatedAt time.Time `json:"created_at"`
 	// Current is the 1-based index of the step being executed (0 = not started).
 	Current int `json:"current,omitempty"`
+	// ReplanCount tracks how many times the plan was re-generated after step failures.
+	ReplanCount int `json:"replan_count,omitempty"`
 }
 
 // Manager holds the active plan for a session.

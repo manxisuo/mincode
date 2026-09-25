@@ -818,6 +818,7 @@ func (a *App) handleCommand(ctx context.Context, line string) (quit bool) {
   /plan approve      run the approved plan step by step (Ctrl+C to stop mid-run)
   /plan reject       discard the draft plan
   /plan cancel       mark an approved (not yet finished) plan cancelled
+  /auto <goal>       plan-and-execute: auto-draft, approve, run with failure recovery
   /trace [n]         show last n raw trace events (default 30)
   /metrics           show session token/time metrics
   /clear             clear conversation history
@@ -842,6 +843,8 @@ Trace file:
 		a.handleExportCommand(fields[1:])
 	case "/plan":
 		a.handlePlanCommand(ctx, fields[1:])
+	case "/auto":
+		a.handleAutoCommand(ctx, fields[1:])
 	case "/trace":
 		n := 30
 		if len(fields) > 1 {
@@ -1426,6 +1429,335 @@ func buildPlanStepPrompt(index, total int, goal, title string, prior []string) s
 	b.WriteString("- Be decisive: a few tool calls, then stop.\n")
 	b.WriteString("- Reply with a one-line summary of what you did (no tool calls once done).\n")
 	return b.String()
+}
+
+const maxReplans = 3
+
+// handleAutoCommand: /auto <goal> — plan-and-execute with automatic failure recovery.
+func (a *App) handleAutoCommand(ctx context.Context, args []string) {
+	goal := strings.TrimSpace(strings.Join(args, " "))
+	if goal == "" {
+		fmt.Fprintf(a.out, "%s usage: /auto <goal>\n", yellow("usage:"))
+		return
+	}
+
+	// Step 1: draft plan via LLM.
+	fmt.Fprintf(a.out, "%s auto: planning for: %s\n", cyan("auto"), bold(goal))
+	p, err := a.draftPlanForAuto(ctx, goal)
+	if err != nil {
+		fmt.Fprintf(a.out, "%s plan generation failed: %v\n", red("error:"), err)
+		return
+	}
+
+	// Step 2: auto-approve.
+	if err := p.Approve(); err != nil {
+		fmt.Fprintf(a.out, "%s %v\n", red("error:"), err)
+		return
+	}
+	a.emit(observability.EventPlanApproved, observability.PlanEventData{
+		PlanID:    p.ID,
+		Goal:      p.Goal,
+		Status:    string(p.Status),
+		StepCount: len(p.Steps),
+	})
+	fmt.Fprintf(a.out, "%s plan approved (%d steps) — executing\n\n", green("ok"), len(p.Steps))
+
+	// Step 3: execute with failure recovery.
+	a.autoPlanAndRun(ctx, p)
+}
+
+// draftPlanForAuto generates a plan via LLM and stores it as the active plan.
+func (a *App) draftPlanForAuto(ctx context.Context, goal string) (*plan.Plan, error) {
+	req := llm.ChatRequest{
+		Messages: []llm.Message{
+			{
+				Role: llm.RoleSystem,
+				Content: `You break a coding task into a short numbered execution plan.
+Output ONLY a numbered list (3-8 steps). Each step is one concrete action.
+No prose before or after the list. No nested sub-steps.
+Example:
+1. Read the main router file
+2. Add a /health handler
+3. Write unit tests for /health
+4. Run go test ./...`,
+			},
+			{Role: llm.RoleUser, Content: goal},
+		},
+	}
+
+	a.emit(observability.EventPlanCreated, observability.PlanEventData{
+		Goal:   goal,
+		Status: string(plan.StatusDraft),
+		Reason: "auto-generating",
+	})
+
+	resp, err := a.provider.Chat(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	titles := plan.ParseStepList(resp.Content)
+	if len(titles) == 0 {
+		return nil, fmt.Errorf("model returned no parseable steps")
+	}
+	if len(titles) > 8 {
+		titles = titles[:8]
+	}
+
+	id := "plan-" + time.Now().UTC().Format("150405")
+	p := plan.NewPlan(id, goal, titles)
+	a.plans.SetCurrent(p)
+
+	a.emit(observability.EventPlanCreated, observability.PlanEventData{
+		PlanID:    p.ID,
+		Goal:      goal,
+		Status:    string(p.Status),
+		StepCount: len(p.Steps),
+	})
+
+	fmt.Fprintln(a.out)
+	fmt.Fprint(a.out, p.Format())
+	fmt.Fprintln(a.out)
+	return p, nil
+}
+
+// autoPlanAndRun executes a plan step by step, re-planning on failure.
+func (a *App) autoPlanAndRun(ctx context.Context, p *plan.Plan) {
+	a.echoTools.Store(true)
+	defer a.echoTools.Store(false)
+
+	planStepBudget := a.agent.MaxSteps
+	var stepNotes []string
+
+	for i := 0; i < len(p.Steps); {
+		if err := ctx.Err(); err != nil {
+			p.Cancel()
+			fmt.Fprintf(a.out, "\n%s interrupted before step %d — session still alive\n", yellow("auto"), i+1)
+			return
+		}
+		if p.Status == plan.StatusCancelled {
+			fmt.Fprintf(a.out, "\n%s stopped before step %d\n", yellow("auto"), i+1)
+			return
+		}
+
+		step := p.Steps[i]
+		if err := p.StartStep(step.Index); err != nil {
+			fmt.Fprintf(a.out, "%s %v\n", red("error:"), err)
+			return
+		}
+		a.emit(observability.EventPlanStepStarted, observability.PlanEventData{
+			PlanID:      p.ID,
+			StepIndex:   step.Index,
+			StepTitle:   step.Title,
+			StepCount:   len(p.Steps),
+			DoneCount:   i,
+			ReplanCount: p.ReplanCount,
+		})
+		fmt.Fprintf(a.out, "%s step %d/%d %s\n",
+			cyan("→"), step.Index, len(p.Steps), bold(step.Title))
+
+		prompt := buildPlanStepPrompt(step.Index, len(p.Steps), p.Goal, step.Title, stepNotes)
+
+		res, err := a.agent.Run(ctx, prompt)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				_ = p.CancelStep(step.Index, "cancelled")
+				a.emit(observability.EventPlanStepFailed, observability.PlanEventData{
+					PlanID:    p.ID,
+					StepIndex: step.Index,
+					StepTitle: step.Title,
+					Error:     "cancelled",
+					Status:    string(plan.StatusCancelled),
+				})
+				fmt.Fprintf(a.out, "\n%s interrupted at step %d — session still alive\n", yellow("auto"), step.Index)
+				return
+			}
+			if errors.Is(err, agent.MaxStepsExceeded) {
+				err = fmt.Errorf("step budget exceeded (%d tool/LLM turns)", planStepBudget)
+			}
+
+			// Attempt re-plan on failure.
+			if p.ReplanCount < maxReplans {
+				p.ReplanCount++
+				a.emit(observability.EventPlanReplan, observability.PlanEventData{
+					PlanID:      p.ID,
+					StepIndex:   step.Index,
+					StepTitle:   step.Title,
+					Error:       err.Error(),
+					ReplanCount: p.ReplanCount,
+					Reason:      fmt.Sprintf("step %d failed: %v", step.Index, err),
+				})
+				fmt.Fprintf(a.out, "%s step %d failed, re-planning (attempt %d/%d): %v\n",
+					yellow("replan"), step.Index, p.ReplanCount, maxReplans, err)
+
+				_ = p.FailStep(step.Index, err.Error()+" [replanning]")
+				newPlan, replanErr := a.replanFromFailure(ctx, p, step.Index, err.Error(), stepNotes)
+				if replanErr != nil {
+					fmt.Fprintf(a.out, "%s re-plan failed: %v\n", red("error:"), replanErr)
+					fmt.Fprintf(a.out, "%s plan aborted\n", red("✗"))
+					return
+				}
+				// Resume with the new plan from the same position.
+				p = newPlan
+				stepNotes = append(stepNotes, fmt.Sprintf("- Step %d (%s): FAILED — %v", step.Index, step.Title, err))
+				continue
+			}
+
+			_ = p.FailStep(step.Index, err.Error())
+			done, total := p.Progress()
+			a.emit(observability.EventPlanStepFailed, observability.PlanEventData{
+				PlanID:    p.ID,
+				StepIndex: step.Index,
+				StepTitle: step.Title,
+				Error:     err.Error(),
+				DoneCount: done,
+				StepCount: total,
+			})
+			fmt.Fprintf(a.out, "%s step %d failed (no more replans): %v\n", red("✗"), step.Index, err)
+			return
+		}
+
+		full := strings.TrimSpace(res.Final)
+		summary := full
+		if summary == "" {
+			summary = "ok"
+		}
+
+		// Detect step failure: agent returned success but tools reported errors.
+		stepFailed := res.ToolErrors > 0
+		if stepFailed && p.ReplanCount < maxReplans {
+			p.ReplanCount++
+			errMsg := fmt.Sprintf("%d tool call(s) failed", res.ToolErrors)
+			a.emit(observability.EventPlanReplan, observability.PlanEventData{
+				PlanID:      p.ID,
+				StepIndex:   step.Index,
+				StepTitle:   step.Title,
+				Error:       errMsg,
+				ReplanCount: p.ReplanCount,
+				Reason:      fmt.Sprintf("step %d: %s", step.Index, errMsg),
+			})
+			fmt.Fprintf(a.out, "%s step %d had errors, re-planning (attempt %d/%d): %s\n",
+				yellow("replan"), step.Index, p.ReplanCount, maxReplans, errMsg)
+
+			_ = p.FailStep(step.Index, errMsg+" [replanning]")
+			newPlan, replanErr := a.replanFromFailure(ctx, p, step.Index, errMsg, stepNotes)
+			if replanErr != nil {
+				fmt.Fprintf(a.out, "%s re-plan failed: %v\n", red("error:"), replanErr)
+				fmt.Fprintf(a.out, "%s plan aborted\n", red("✗"))
+				return
+			}
+			p = newPlan
+			stepNotes = append(stepNotes, fmt.Sprintf("- Step %d (%s): FAILED — %s", step.Index, step.Title, errMsg))
+			i = 0
+			continue
+		}
+
+		if len(summary) > 120 {
+			summary = truncateStr(summary, 120)
+		}
+		_ = p.CompleteStep(step.Index, summary)
+		stepNotes = append(stepNotes, fmt.Sprintf("- Step %d (%s): %s", step.Index, step.Title, summary))
+		done, total := p.Progress()
+		a.emit(observability.EventPlanStepFinished, observability.PlanEventData{
+			PlanID:    p.ID,
+			StepIndex: step.Index,
+			StepTitle: step.Title,
+			Result:    summary,
+			DoneCount: done,
+			StepCount: total,
+		})
+		if full != "" {
+			fmt.Fprintln(a.out)
+			fmt.Fprintln(a.out, full)
+			fmt.Fprintln(a.out)
+		}
+		fmt.Fprintf(a.out, "%s step %d done\n\n", green("✓"), step.Index)
+		i++
+	}
+
+	p.Finish()
+	done, total := p.Progress()
+	a.emit(observability.EventPlanFinished, observability.PlanEventData{
+		PlanID:      p.ID,
+		Goal:        p.Goal,
+		Status:      string(p.Status),
+		DoneCount:   done,
+		StepCount:   total,
+		ReplanCount: p.ReplanCount,
+	})
+	fmt.Fprintln(a.out)
+	fmt.Fprint(a.out, p.Format())
+	if p.Status == plan.StatusDone {
+		extra := ""
+		if p.ReplanCount > 0 {
+			extra = fmt.Sprintf(" (replanned %d time(s))", p.ReplanCount)
+		}
+		fmt.Fprintf(a.out, "\n%s plan %s complete%s\n", green("ok"), bold(p.ID), extra)
+	}
+	fmt.Fprintln(a.out)
+}
+
+// replanFromFailure asks the LLM to generate a fresh plan that accounts for
+// the failure and completed steps. Returns a new approved plan ready to resume.
+func (a *App) replanFromFailure(ctx context.Context, oldPlan *plan.Plan, failedStep int, failureMsg string, priorNotes []string) (*plan.Plan, error) {
+	var contextBuilder strings.Builder
+	fmt.Fprintf(&contextBuilder, "Previous plan for goal: %s\n", oldPlan.Goal)
+	fmt.Fprintf(&contextBuilder, "Failed at step %d: %s\n", failedStep, failureMsg)
+	if len(priorNotes) > 0 {
+		contextBuilder.WriteString("\nCompleted steps before failure:\n")
+		for _, n := range priorNotes {
+			contextBuilder.WriteString(n + "\n")
+		}
+	}
+	contextBuilder.WriteString("\nGenerate a NEW numbered plan that:")
+	contextBuilder.WriteString("\n1. Accounts for what was already completed")
+	contextBuilder.WriteString("\n2. Handles the failure (try a different approach)")
+	contextBuilder.WriteString("\n3. Completes the remaining work")
+
+	req := llm.ChatRequest{
+		Messages: []llm.Message{
+			{
+				Role:    llm.RoleSystem,
+				Content: "You re-plan a failed coding task. Output ONLY a numbered list (3-8 steps). No prose.",
+			},
+			{Role: llm.RoleUser, Content: contextBuilder.String()},
+		},
+	}
+
+	resp, err := a.provider.Chat(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	titles := plan.ParseStepList(resp.Content)
+	if len(titles) == 0 {
+		return nil, fmt.Errorf("model returned no parseable steps")
+	}
+	if len(titles) > 8 {
+		titles = titles[:8]
+	}
+
+	id := oldPlan.ID + "-r" + fmt.Sprint(oldPlan.ReplanCount)
+	p := plan.NewPlan(id, oldPlan.Goal, titles)
+	p.ReplanCount = oldPlan.ReplanCount
+	a.plans.SetCurrent(p)
+
+	a.emit(observability.EventPlanCreated, observability.PlanEventData{
+		PlanID:      p.ID,
+		Goal:        p.Goal,
+		Status:      string(p.Status),
+		StepCount:   len(p.Steps),
+		ReplanCount: p.ReplanCount,
+		Reason:      fmt.Sprintf("replan after step %d failure", failedStep),
+	})
+
+	fmt.Fprintln(a.out)
+	fmt.Fprintf(a.out, "%s new plan (%d steps):\n", cyan("replan"), len(p.Steps))
+	fmt.Fprint(a.out, p.Format())
+	fmt.Fprintln(a.out)
+
+	if err := p.Approve(); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 func formatSnapshot(s ctxmgr.Snapshot) string {

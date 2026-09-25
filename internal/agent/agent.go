@@ -156,11 +156,12 @@ func (a *Agent) setState(to State) {
 
 // Result is the outcome of one user turn.
 type Result struct {
-	Final     string
-	Steps     int
-	ToolCalls int
-	State     State
-	Snapshot  *ctxmgr.Snapshot
+	Final      string
+	Steps      int
+	ToolCalls  int
+	ToolErrors int // number of tool calls that returned errors
+	State      State
+	Snapshot   *ctxmgr.Snapshot
 }
 
 // Run processes one user message through the agent loop.
@@ -168,10 +169,11 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 	a.Ctx.AppendUser(userInput)
 
 	var (
-		steps     int
-		toolCalls int
-		lastKey   string
-		repeats   int
+		steps      int
+		toolCalls  int
+		toolErrors int
+		lastKey    string
+		repeats    int
 	)
 
 	for step := 0; step < a.MaxSteps; step++ {
@@ -254,11 +256,12 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 			})
 			a.setState(StateFinished)
 			return &Result{
-				Final:     resp.Content,
-				Steps:     steps,
-				ToolCalls: toolCalls,
-				State:     StateFinished,
-				Snapshot:  a.Ctx.LastSnapshot(),
+				Final:      resp.Content,
+				Steps:      steps,
+				ToolCalls:  toolCalls,
+				ToolErrors: toolErrors,
+				State:      StateFinished,
+				Snapshot:   a.Ctx.LastSnapshot(),
 			}, nil
 		}
 
@@ -292,7 +295,12 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 		}
 
 		toolCalls += len(resp.ToolCalls)
-		_, execErr := a.executeToolCalls(ctx, resp.ToolCalls)
+		outcomes, execErr := a.executeToolCalls(ctx, resp.ToolCalls)
+		for _, o := range outcomes {
+			if o.result.IsError {
+				toolErrors++
+			}
+		}
 		if execErr != nil {
 			if isCancelErr(execErr) {
 				a.setState(StateCancelled)
@@ -304,10 +312,11 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 
 	a.setState(StateMaxStepsReached)
 	return &Result{
-		Steps:     steps,
-		ToolCalls: toolCalls,
-		State:     StateMaxStepsReached,
-		Snapshot:  a.Ctx.LastSnapshot(),
+		Steps:      steps,
+		ToolCalls:  toolCalls,
+		ToolErrors: toolErrors,
+		State:      StateMaxStepsReached,
+		Snapshot:   a.Ctx.LastSnapshot(),
 	}, fmt.Errorf("%w: %d", MaxStepsExceeded, a.MaxSteps)
 }
 

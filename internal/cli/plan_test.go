@@ -174,3 +174,130 @@ func TestPlanShowEmpty(t *testing.T) {
 		t.Fatalf("out = %q", buf.String())
 	}
 }
+
+func TestAutoNoGoal(t *testing.T) {
+	app := newPlanApp(t)
+	var buf bytes.Buffer
+	app.out = &buf
+	app.handleCommand(context.Background(), "/auto")
+	if !strings.Contains(buf.String(), "usage:") {
+		t.Fatalf("expected usage: %q", buf.String())
+	}
+}
+
+func TestAutoPlanAndExecute(t *testing.T) {
+	app := newPlanApp(t)
+	fake := &llm.FakeProvider{
+		Responses: []llm.ChatResponse{
+			{Content: "1. Read main.go\n2. Report package name\n"},
+			{Content: "Read package main"},
+			{Content: "package is main"},
+		},
+	}
+	app.agent.Provider = fake
+	app.provider = fake
+
+	var buf bytes.Buffer
+	app.out = &buf
+	ctx := context.Background()
+
+	app.handleCommand(ctx, "/auto analyze main package")
+	out := buf.String()
+
+	// Should contain plan draft, approval, step execution, and completion.
+	if !strings.Contains(out, "plan approved") {
+		t.Fatalf("missing plan approved: %q", out)
+	}
+	if !strings.Contains(out, "step 1/2") || !strings.Contains(out, "step 2/2") {
+		t.Fatalf("missing step execution: %q", out)
+	}
+	if !strings.Contains(out, "complete") {
+		t.Fatalf("missing completion: %q", out)
+	}
+
+	p := app.plans.Current()
+	if p == nil || p.Status != plan.StatusDone {
+		t.Fatalf("plan status = %v", p)
+	}
+	if p.ReplanCount != 0 {
+		t.Fatalf("replan_count = %d, want 0", p.ReplanCount)
+	}
+
+	events, err := observability.ReadEvents(app.TracePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[observability.EventType]bool{
+		observability.EventPlanCreated:      false,
+		observability.EventPlanApproved:     false,
+		observability.EventPlanStepStarted:  false,
+		observability.EventPlanStepFinished: false,
+		observability.EventPlanFinished:     false,
+	}
+	for _, e := range events {
+		if _, ok := want[e.Type]; ok {
+			want[e.Type] = true
+		}
+	}
+	for typ, ok := range want {
+		if !ok {
+			t.Fatalf("missing event %s", typ)
+		}
+	}
+}
+
+func TestAutoReplanOnFailure(t *testing.T) {
+	app := newPlanApp(t)
+	// Step 1 plan → step 1 fails → replan → new steps succeed.
+	fake := &llm.FakeProvider{
+		Responses: []llm.ChatResponse{
+			{Content: "1. Run broken test\n2. Fix code\n"},       // initial plan
+			{Content: "", ToolCalls: []llm.ToolCall{{ID: "1", Name: "shell", Arguments: `{"command":"exit 1"}`}}}, // step 1: shell fails, agent continues
+			{Content: "1. Fix the broken code\n2. Run test\n"},  // agent's next response after tool error (becomes step final)
+			{Content: "1. Fix the broken code\n2. Run test\n"},  // replan LLM call
+			{Content: "Fixed code"},                               // new step 1
+			{Content: "Tests pass"},                               // new step 2
+		},
+	}
+	app.agent.Provider = fake
+	app.provider = fake
+	if ap, ok := app.agent.Approver.(*StdinApprover); ok {
+		ap.AutoYes = true
+	}
+
+	var buf bytes.Buffer
+	app.out = &buf
+	ctx := context.Background()
+
+	app.handleCommand(ctx, "/auto fix broken test")
+	out := buf.String()
+
+	if !strings.Contains(out, "replanning") && !strings.Contains(out, "replan") {
+		t.Fatalf("expected re-plan message: %q", out)
+	}
+	if !strings.Contains(out, "complete") {
+		t.Fatalf("expected completion: %q", out)
+	}
+
+	p := app.plans.Current()
+	if p == nil || p.Status != plan.StatusDone {
+		t.Fatalf("plan status = %v", p)
+	}
+	if p.ReplanCount != 1 {
+		t.Fatalf("replan_count = %d, want 1", p.ReplanCount)
+	}
+
+	events, err := observability.ReadEvents(app.TracePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sawReplan := false
+	for _, e := range events {
+		if e.Type == observability.EventPlanReplan {
+			sawReplan = true
+		}
+	}
+	if !sawReplan {
+		t.Fatal("missing plan.replan event")
+	}
+}

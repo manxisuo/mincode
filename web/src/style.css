@@ -571,6 +571,20 @@ button.linkish:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.replay-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
 .subhead .chev {
   display: inline-block;
   width: 12px;

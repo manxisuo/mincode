@@ -13,6 +13,7 @@ import PlanPanel from "./components/PlanPanel.vue";
 import PermissionBar from "./components/PermissionBar.vue";
 import SessionsPanel from "./components/SessionsPanel.vue";
 import SkillsPanel from "./components/SkillsPanel.vue";
+import { apiContextAtStep } from "./api";
 import ToolCallModal, {
   type ToolCallDetail,
 } from "./components/ToolCallModal.vue";
@@ -20,7 +21,7 @@ import WireRequestModal from "./components/WireRequestModal.vue";
 import { useI18n } from "./i18n";
 import { useInspector } from "./composables/useInspector";
 import { useTheme } from "./theme";
-import type { RuntimeEvent } from "./types";
+import type { ContextSnapshot, RuntimeEvent } from "./types";
 import { apiWire, type WireRecord } from "./wireApi";
 
 const { theme, toggle } = useTheme();
@@ -77,6 +78,55 @@ const fileOpen = ref(false);
 const fileDetail = ref<FileChangeDetail | null>(null);
 const toolOpen = ref(false);
 const toolDetail = ref<ToolCallDetail | null>(null);
+const replaySnap = ref<ContextSnapshot | null>(null);
+const replayStep = ref<number | null>(null);
+
+/** T-obs-5: pin Inspector to historical state at this Timeline event. */
+function onReplay(e: RuntimeEvent) {
+  const d = (e.data || {}) as Record<string, unknown>;
+  let step = Number(e.step ?? d.step ?? 0);
+  // Many tool/agent events lack step — walk back to the nearest known build step.
+  if (!step) {
+    const list = events.value;
+    const idx = list.indexOf(e);
+    for (let i = idx >= 0 ? idx : list.length - 1; i >= 0; i--) {
+      const ev = list[i];
+      const s = Number(ev.step || ((ev.data as Record<string, unknown> | undefined)?.step as number) || 0);
+      if (s > 0) {
+        step = s;
+        break;
+      }
+    }
+  }
+  void (async () => {
+    if (!step) {
+      // Fallback: use the latest available snapshot step.
+      try {
+        const cur = await apiContext();
+        step = Number((cur as unknown as { step?: number }).step || 0);
+      } catch {
+        step = 0;
+      }
+    }
+    if (!step) {
+      replaySnap.value = null;
+      replayStep.value = -1;
+      return;
+    }
+    try {
+      const data = await apiContextAtStep(step);
+      replaySnap.value = data.snapshot || null;
+    } catch {
+      replaySnap.value = null;
+    }
+    replayStep.value = step;
+  })();
+}
+
+function exitReplay() {
+  replaySnap.value = null;
+  replayStep.value = null;
+}
 const wireOpen = ref(false);
 const wireRecord = ref<WireRecord | null>(null);
 const wireEvent = ref<RuntimeEvent | null>(null);
@@ -371,13 +421,16 @@ async function onSwitchSession(id: string) {
         />
         <InspectorPanel
           :metrics="metrics"
-          :snapshot="snapshot"
+          :snapshot="replaySnap || snapshot"
+          :replay-step="replayStep"
           :events="events"
           :time-fmt="fmtTime"
           :event-class="eventClass"
           :short-type="shortType"
           :preview-data="previewData"
           @deeplink="onTimelineDeepLink"
+          @replay="onReplay"
+          @exit-replay="exitReplay"
         />
       </template>
       <PlanPanel

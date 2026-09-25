@@ -9,6 +9,8 @@ const { t } = useI18n();
 const props = defineProps<{
   metrics: MetricsInfo;
   snapshot: ContextSnapshot | null;
+  /** T-obs-5: non-null when Inspector is pinned to a historical step. */
+  replayStep?: number | null;
   events: RuntimeEvent[];
   timeFmt: (iso?: string) => string;
   eventClass: (type: string) => string;
@@ -23,6 +25,7 @@ const emit = defineEmits<{
     sourceEvents?: RuntimeEvent[],
   ];
   replay: [e: RuntimeEvent, sourceEvents?: RuntimeEvent[]];
+  "exit-replay": [];
 }>();
 
 function isDeeplink(e: RuntimeEvent): boolean {
@@ -556,6 +559,12 @@ function rawJson(e: RuntimeEvent) {
       </button>
     </div>
     <div v-show="ctxOpen" class="context" :style="{ maxHeight: ctxSplit + 'px' }">
+      <div v-if="replayStep != null" class="replay-banner">
+        <span>{{ t("insp.replayAt", { n: replayStep }) }}</span>
+        <button type="button" class="linkish" @click="emit('exit-replay')">
+          {{ t("insp.exitReplay") }}
+        </button>
+      </div>
       <div v-if="!ctxRuns.length" class="empty">{{ t("insp.noSnap") }}</div>
       <template v-else>
         <div v-if="snapshot?.notes?.length" class="ctx-notes">

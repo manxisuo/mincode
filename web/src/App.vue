@@ -82,25 +82,26 @@ const replaySnap = ref<ContextSnapshot | null>(null);
 const replayStep = ref<number | null>(null);
 
 /** T-obs-5: pin Inspector to historical state at this Timeline event. */
-function onReplay(e: RuntimeEvent) {
-  const d = (e.data || {}) as Record<string, unknown>;
-  let step = Number(e.step ?? d.step ?? 0);
-  // Many tool/agent events lack step — walk back to the nearest known build step.
-  if (!step) {
-    const list = events.value;
-    const idx = list.indexOf(e);
-    for (let i = idx >= 0 ? idx : list.length - 1; i >= 0; i--) {
-      const ev = list[i];
-      const s = Number(ev.step || ((ev.data as Record<string, unknown> | undefined)?.step as number) || 0);
-      if (s > 0) {
-        step = s;
-        break;
-      }
+function onReplay(e: RuntimeEvent, sourceEvents?: RuntimeEvent[]) {
+  const list = sourceEvents && sourceEvents.length ? sourceEvents : events.value;
+  let idx = list.findIndex((x) => x === e);
+  if (idx < 0 && e.id) {
+    idx = list.findIndex((x) => x.id === e.id && x.type === e.type);
+  }
+  if (idx < 0) idx = list.length - 1;
+  // Snapshot.Step is BuildRequest order (1..N). Event.Step is often ctx length —
+  // take the nearest preceding context.built / llm.wire_request's data.step.
+  let step = 0;
+  for (let i = idx; i >= 0; i--) {
+    const ev = list[i];
+    if (ev.type === "context.built" || ev.type === "llm.wire_request") {
+      step = Number((ev.data as Record<string, unknown> | undefined)?.step || 0);
+      if (step > 0) break;
     }
   }
+  if (!step) step = Number(e.data?.step || e.step || 0);
   void (async () => {
     if (!step) {
-      // Fallback: use the latest available snapshot step.
       try {
         const cur = await apiContext();
         step = Number((cur as unknown as { step?: number }).step || 0);

@@ -555,18 +555,18 @@ Forbidden Changes
 
 Skill 是按需加载的任务知识。
 
-例如：
+例如（Skill 由 workspace 提供，仓库不内置示例）：
 
 ```text
-skills/
-└── go-testing/
+<workspace>/skills/
+└── <name>/
     └── SKILL.md
 ```
 
 初期手动激活：
 
 ```text
-/skill go-testing
+/skill <name>
 ```
 
 后续再研究自动选择。

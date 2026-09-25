@@ -308,7 +308,7 @@ SKILL.md
 只支持手工激活：
 
 ```text
-/skill go-testing
+/skill <name>
 ```
 
 ### Inspector

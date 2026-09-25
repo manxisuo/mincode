@@ -417,7 +417,7 @@ Sub-Agent
 MCP
 Long-term Memory
 Adaptive Tool Selection
-Plan-and-Execute
+Plan-and-Execute       ✅ 已实现（/auto 命令 + 自动重规划）
 Local Web Inspector     ✅ W1 已实现（HTTP/SSE + web/）
 LLM Streaming Output    ✅ 已实现（SSE 增量 + TTFT + CLI/Web 展示）
 Transparency Deepening  ✅ 已实现（T-obs-1~7）

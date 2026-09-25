@@ -228,6 +228,13 @@ func TestInstructionsLoadedAtStartup(t *testing.T) {
 	}
 }
 
+func TestWebFetchToolRegistered(t *testing.T) {
+	app, _ := newTestAppWithWorkspace(t)
+	if _, ok := app.agent.Tools.Get("web_fetch"); !ok {
+		t.Fatal("web_fetch should always be registered (no backend needed)")
+	}
+}
+
 func TestBuildWebSearch(t *testing.T) {
 	if p, err := buildWebSearch(config.Config{}); err != nil || p != nil {
 		t.Fatalf("disabled: provider=%v err=%v", p, err)

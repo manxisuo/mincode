@@ -59,6 +59,7 @@ func NewDefaultPolicy() *DefaultPolicy {
 			"glob":       Allow,
 			"grep":       Allow,
 			"web_search": Allow, // read-only network query; backend must be configured
+			"web_fetch":  Allow, // read-only URL fetch; SSRF guard blocks private targets
 			"write_file": Ask,
 			"edit_file":  Ask,
 			"shell":      Ask, // Phase 5; reserved

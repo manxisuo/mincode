@@ -21,7 +21,7 @@ func writeTestFile(ws *tools.Workspace, rel, content string) error {
 }
 
 func TestParallelSafeIncludesWebSearch(t *testing.T) {
-	for _, name := range []string{"read_file", "list_dir", "glob", "grep", "web_search"} {
+	for _, name := range []string{"read_file", "list_dir", "glob", "grep", "web_search", "web_fetch"} {
 		if !isParallelSafe(name) {
 			t.Fatalf("%s should be parallel-safe", name)
 		}

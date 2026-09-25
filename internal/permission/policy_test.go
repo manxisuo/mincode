@@ -19,6 +19,9 @@ func TestDefaultPolicy(t *testing.T) {
 	if p.Evaluate(Request{Tool: "web_search"}) != Allow {
 		t.Fatal("web_search should allow (read-only, backend must be configured)")
 	}
+	if p.Evaluate(Request{Tool: "web_fetch"}) != Allow {
+		t.Fatal("web_fetch should allow (read-only, SSRF-guarded)")
+	}
 }
 
 func TestEvaluateAllowDenyAsk(t *testing.T) {

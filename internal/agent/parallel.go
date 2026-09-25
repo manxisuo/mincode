@@ -24,6 +24,7 @@ var parallelSafeTools = map[string]bool{
 	"glob":       true,
 	"grep":       true,
 	"web_search": true,
+	"web_fetch":  true,
 }
 
 func isParallelSafe(name string) bool { return parallelSafeTools[name] }

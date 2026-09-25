@@ -20,6 +20,7 @@ import (
 	"github.com/manxisuo/mincode/internal/session"
 	"github.com/manxisuo/mincode/internal/skill"
 	"github.com/manxisuo/mincode/internal/tools"
+	"github.com/manxisuo/mincode/internal/webfetch"
 )
 
 // WebOptions configures `mincode web`.
@@ -116,6 +117,7 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 	registry.Register(&tools.WriteFile{WS: ws})
 	registry.Register(&tools.EditFile{WS: ws})
 	registry.Register(&tools.Shell{WS: ws})
+	registry.Register(&tools.WebFetch{Fetcher: webfetch.NewHTTPFetcher(0)})
 
 	if searchProvider, err := buildWebSearch(cfg); err != nil {
 		return err

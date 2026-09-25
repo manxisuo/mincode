@@ -31,6 +31,7 @@ import (
 	"github.com/manxisuo/mincode/internal/session"
 	"github.com/manxisuo/mincode/internal/skill"
 	"github.com/manxisuo/mincode/internal/tools"
+	"github.com/manxisuo/mincode/internal/webfetch"
 	"github.com/manxisuo/mincode/internal/websearch"
 )
 
@@ -144,6 +145,7 @@ func NewApp(opts Options) (*App, error) {
 	registry.Register(&tools.WriteFile{WS: ws})
 	registry.Register(&tools.EditFile{WS: ws})
 	registry.Register(&tools.Shell{WS: ws})
+	registry.Register(&tools.WebFetch{Fetcher: webfetch.NewHTTPFetcher(0)})
 
 	if searchProvider, err := buildWebSearch(cfg); err != nil {
 		_ = recorder.Close()

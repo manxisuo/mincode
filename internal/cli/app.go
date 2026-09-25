@@ -816,9 +816,9 @@ func (a *App) handleCommand(ctx context.Context, line string) (quit bool) {
   /plan <goal>       draft a plan for a task
   /plan              show current plan
   /plan approve      run the approved plan step by step (Ctrl+C to stop mid-run)
+  /plan auto <goal>  plan-and-execute: auto-draft, approve, run with failure recovery
   /plan reject       discard the draft plan
   /plan cancel       mark an approved (not yet finished) plan cancelled
-  /auto <goal>       plan-and-execute: auto-draft, approve, run with failure recovery
   /trace [n]         show last n raw trace events (default 30)
   /metrics           show session token/time metrics
   /clear             clear conversation history
@@ -843,8 +843,6 @@ Trace file:
 		a.handleExportCommand(fields[1:])
 	case "/plan":
 		a.handlePlanCommand(ctx, fields[1:])
-	case "/auto":
-		a.handleAutoCommand(ctx, fields[1:])
 	case "/trace":
 		n := 30
 		if len(fields) > 1 {
@@ -1149,6 +1147,9 @@ func (a *App) handlePlanCommand(ctx context.Context, args []string) {
 		a.cancelPlan()
 	case "show", "status":
 		a.printCurrentPlan()
+	case "auto":
+		goal := strings.TrimSpace(strings.Join(args[1:], " "))
+		a.handleAutoCommand(ctx, goal)
 	default:
 		goal := strings.TrimSpace(strings.Join(args, " "))
 		a.draftPlan(ctx, goal)
@@ -1439,9 +1440,8 @@ func buildPlanStepPrompt(index, total int, goal, title string, prior []string) s
 
 const maxReplans = 3
 
-// handleAutoCommand: /auto <goal> — plan-and-execute with automatic failure recovery.
-func (a *App) handleAutoCommand(ctx context.Context, args []string) {
-	goal := strings.TrimSpace(strings.Join(args, " "))
+// handleAutoCommand: /plan auto <goal> — plan-and-execute with automatic failure recovery.
+func (a *App) handleAutoCommand(ctx context.Context, goal string) {
 	if goal == "" {
 		fmt.Fprintf(a.out, "%s usage: /auto <goal>\n", yellow("usage:"))
 		return

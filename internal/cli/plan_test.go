@@ -179,7 +179,7 @@ func TestAutoNoGoal(t *testing.T) {
 	app := newPlanApp(t)
 	var buf bytes.Buffer
 	app.out = &buf
-	app.handleCommand(context.Background(), "/auto")
+	app.handleCommand(context.Background(), "/plan auto")
 	if !strings.Contains(buf.String(), "usage:") {
 		t.Fatalf("expected usage: %q", buf.String())
 	}
@@ -201,7 +201,7 @@ func TestAutoPlanAndExecute(t *testing.T) {
 	app.out = &buf
 	ctx := context.Background()
 
-	app.handleCommand(ctx, "/auto analyze main package")
+	app.handleCommand(ctx, "/plan auto analyze main package")
 	out := buf.String()
 
 	// Should contain plan draft, approval, step execution, and completion.
@@ -269,7 +269,7 @@ func TestAutoReplanOnFailure(t *testing.T) {
 	app.out = &buf
 	ctx := context.Background()
 
-	app.handleCommand(ctx, "/auto fix broken test")
+	app.handleCommand(ctx, "/plan auto fix broken test")
 	out := buf.String()
 
 	if !strings.Contains(out, "replanning") && !strings.Contains(out, "replan") {

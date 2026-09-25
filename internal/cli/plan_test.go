@@ -251,12 +251,12 @@ func TestAutoReplanOnFailure(t *testing.T) {
 	// Step 1 plan → step 1 fails → replan → new steps succeed.
 	fake := &llm.FakeProvider{
 		Responses: []llm.ChatResponse{
-			{Content: "1. Run broken test\n2. Fix code\n"},       // initial plan
+			{Content: "1. Run broken test\n2. Fix code\n"},                                                        // initial plan
 			{Content: "", ToolCalls: []llm.ToolCall{{ID: "1", Name: "shell", Arguments: `{"command":"exit 1"}`}}}, // step 1: shell fails, agent continues
-			{Content: "1. Fix the broken code\n2. Run test\n"},  // agent's next response after tool error (becomes step final)
-			{Content: "1. Fix the broken code\n2. Run test\n"},  // replan LLM call
-			{Content: "Fixed code"},                               // new step 1
-			{Content: "Tests pass"},                               // new step 2
+			{Content: "1. Fix the broken code\n2. Run test\n"},                                                    // agent's next response after tool error (becomes step final)
+			{Content: "1. Fix the broken code\n2. Run test\n"},                                                    // replan LLM call
+			{Content: "Fixed code"},                                                                               // new step 1
+			{Content: "Tests pass"},                                                                               // new step 2
 		},
 	}
 	app.agent.Provider = fake

@@ -16,13 +16,13 @@ const DefaultBudgetTokens = 32000
 const maxToolResultTokens = 2500
 
 type entry struct {
-	msg     llm.Message
-	source  Source
-	tokens  int
-	callID  string
-	tool    string
-	path    string
-	lines   string
+	msg       llm.Message
+	source    Source
+	tokens    int
+	callID    string
+	tool      string
+	path      string
+	lines     string
 	prodStep  int
 	enterStep int
 }
@@ -41,7 +41,7 @@ type Manager struct {
 	prevSnapshot *Snapshot
 	// snapHist keeps recent snapshots by step for historical replay (T-obs-5).
 	snapHist []*Snapshot
-	cal          *Calibrator
+	cal      *Calibrator
 }
 
 // maxSnapHist bounds historical snapshots kept for replay.

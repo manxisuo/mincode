@@ -217,7 +217,7 @@ func ClassifyShell(command string) Level {
 	// Multi-segment: most restrictive wins (Deny > Ask > Allow).
 	worst := Allow
 	for _, seg := range segments {
-	 lvl := classifySingleSegment(seg)
+		lvl := classifySingleSegment(seg)
 		if lvl == Deny {
 			return Deny
 		}

@@ -1,0 +1,4 @@
+# Normalize text files to LF in the repository.
+* text=auto
+# Go source is always LF regardless of platform / core.autocrlf.
+*.go text eol=lf

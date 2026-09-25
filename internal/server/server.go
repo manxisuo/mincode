@@ -399,17 +399,17 @@ func (s *Server) handleContext(w http.ResponseWriter, r *http.Request) {
 		steps = s.agent.Ctx.SnapHistory()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"items":          snap.Items,
-		"step":           snap.Step,
-		"total_tokens":   snap.TotalTokens,
-		"tool_tokens":    snap.ToolTokens,
-		"budget":         snap.Budget,
-		"included_count": snap.Included,
-		"excluded_count": snap.Excluded,
+		"items":           snap.Items,
+		"step":            snap.Step,
+		"total_tokens":    snap.TotalTokens,
+		"tool_tokens":     snap.ToolTokens,
+		"budget":          snap.Budget,
+		"included_count":  snap.Included,
+		"excluded_count":  snap.Excluded,
 		"truncated_count": snap.Truncated,
-		"notes":          snap.Notes,
-		"diff":           snap.Diff,
-		"history_steps":  steps,
+		"notes":           snap.Notes,
+		"diff":            snap.Diff,
+		"history_steps":   steps,
 	})
 }
 

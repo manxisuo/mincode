@@ -579,7 +579,7 @@ func (s *Server) replanFromFailure(ctx context.Context, oldPlan *plan.Plan, fail
 	s.emitPlan(observability.EventPlanCreated, observability.PlanEventData{
 		PlanID: p.ID, Goal: p.Goal, Status: string(p.Status),
 		StepCount: len(p.Steps), ReplanCount: p.ReplanCount,
-		Reason:    fmt.Sprintf("replan after step %d failure", failedStep),
+		Reason: fmt.Sprintf("replan after step %d failure", failedStep),
 	})
 	return p, nil
 }

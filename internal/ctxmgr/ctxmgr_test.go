@@ -343,6 +343,30 @@ func TestRepoMapIncluded(t *testing.T) {
 	}
 }
 
+func TestCodeSearchIncluded(t *testing.T) {
+	m := New("SYS", "", 10000)
+	m.SetCodeSearch("Relevant code (lexical search: \"budget\"):\n  ctx/budget.go:3  const DefaultBudgetTokens")
+	m.AppendUser("hi")
+
+	req, snap := m.BuildRequest(nil)
+	found := false
+	for _, it := range snap.Items {
+		if it.Source != SourceCodeSearch {
+			continue
+		}
+		found = true
+		if !it.Included || it.Excluded || !it.Pinned {
+			t.Fatalf("code_search item wrong: %+v", it)
+		}
+	}
+	if !found {
+		t.Fatalf("missing code_search item: %+v", snap.Items)
+	}
+	if req.Messages[0].Role != llm.RoleSystem || !strings.Contains(req.Messages[0].Content, "Relevant code") {
+		t.Fatalf("code_search not in system message: %+v", req.Messages[0])
+	}
+}
+
 func TestAppendReflectionSource(t *testing.T) {
 	m := New("SYS", "", 10000)
 	m.AppendUser("do the task")

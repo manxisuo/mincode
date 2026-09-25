@@ -29,6 +29,7 @@ const (
 	maxLoopRepeats        = 5
 	toolPreviewLen        = 200
 	defaultMaxReflections = 2
+	defaultCodeSearchTopK = 6
 )
 
 // reflectionInstruction is appended as a user message for a self-critique pass.
@@ -82,6 +83,12 @@ type Agent struct {
 	// MaxReflections caps self-critique retries per turn (default 2).
 	MaxReflections int
 
+	// CodeSearch, when set, retrieves query-relevant code before each turn and
+	// pins it into context (source=code_search).
+	CodeSearch CodeSearchProvider
+	// CodeSearchTopK caps injected search hits (default 6).
+	CodeSearchTopK int
+
 	// lastWire is the most recent provider-bound request (T-obs-1 wire view).
 	lastWireMu sync.Mutex
 	lastWire   *WireRecord
@@ -92,6 +99,13 @@ type Agent struct {
 
 	// Instr loads hierarchical AGENTS.md instructions (optional).
 	Instr *instruction.Loader
+}
+
+// CodeSearchProvider retrieves a compact, query-relevant code context block
+// before a turn. codesearch.Index satisfies it structurally, so the Agent does
+// not depend on the implementation package.
+type CodeSearchProvider interface {
+	SearchContext(ctx context.Context, query string, k int) (text string, summary []string, err error)
 }
 
 // WireRecord is one provider-bound LLM request for the wire inspector.
@@ -186,6 +200,7 @@ type Result struct {
 // Run processes one user message through the agent loop.
 func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 	a.Ctx.AppendUser(userInput)
+	a.injectCodeSearch(ctx, userInput)
 
 	var (
 		steps       int
@@ -365,6 +380,45 @@ func (a *Agent) Run(ctx context.Context, userInput string) (*Result, error) {
 		State:      StateMaxStepsReached,
 		Snapshot:   a.Ctx.LastSnapshot(),
 	}, fmt.Errorf("%w: %d", MaxStepsExceeded, a.MaxSteps)
+}
+
+// injectCodeSearch pins query-relevant code into context for the current turn.
+// It always sets (or clears) the code_search source so stale hits from a
+// previous turn never linger.
+func (a *Agent) injectCodeSearch(ctx context.Context, query string) {
+	if a.CodeSearch == nil {
+		return
+	}
+	if strings.TrimSpace(query) == "" {
+		a.Ctx.SetCodeSearch("")
+		return
+	}
+	k := a.CodeSearchTopK
+	if k <= 0 {
+		k = defaultCodeSearchTopK
+	}
+	start := time.Now()
+	text, summary, err := a.CodeSearch.SearchContext(ctx, query, k)
+	elapsed := time.Since(start)
+	if err != nil {
+		a.emit(observability.EventCodeSearchInjected, observability.CodeSearchData{
+			Query:      query,
+			TopK:       k,
+			DurationMS: elapsed.Milliseconds(),
+			Error:      err.Error(),
+		})
+		return
+	}
+	text = strings.TrimSpace(text)
+	a.Ctx.SetCodeSearch(text)
+	a.emit(observability.EventCodeSearchInjected, observability.CodeSearchData{
+		Query:      query,
+		Hits:       len(summary),
+		Top:        summary,
+		TopK:       k,
+		Tokens:     ctxmgr.EstimateTokens(text),
+		DurationMS: elapsed.Milliseconds(),
+	})
 }
 
 func (a *Agent) toolDefinitions() []llm.ToolDefinition {

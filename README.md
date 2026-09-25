@@ -80,6 +80,7 @@ Agent Loop（状态机、loop detection、取消、可选自省 Reflection）
 Tools:
   read_file / list_dir / glob / grep
   repo_map（仓库结构图：路径 + Go 顶层符号，改善导航）
+  code_search（词法相关度检索：路径/符号/签名，BM25）
   write_file / edit_file / shell
   memory_add
   web_search（需配置后端） / web_fetch（抓取 URL 正文）
@@ -93,6 +94,7 @@ Context:
   token budget / snapshot / compression
   Instructions (AGENTS.md 层级) / Skills / Memory
   Repository Map（启动注入，默认 1500 tokens；可 /repomap 查看）
+  Code Search（按当前输入词法检索 top-K 注入，source=code_search；可 /search 查看）
 
 Session 持久化、Trace JSONL、Timeline、Metrics
   · 会话自动 LLM 命名（失败回退首条用户消息截断）
@@ -181,6 +183,7 @@ REPL 内常用命令：
 /skills  /skill <name>
 /memory  /memory add <fact>
 /repomap           查看注入的仓库结构图
+/search <query>    词法代码检索（路径/符号/签名）
 /plan <goal>       草稿计划 → /plan approve
 /export [path]     导出会话 Markdown
 /metrics

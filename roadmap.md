@@ -1,7 +1,7 @@
 # Roadmap
 
 > **状态：Phase 0–12 已全部完成**（含 Hardening 修复、MVP 验收测试、Experiment 分布统计）。
-> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection**、**Repository Map** 均已落地。
+> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection**、**Repository Map**、**Semantic Code Search（词法）** 均已落地。
 
 ## 总体原则
 
@@ -409,7 +409,7 @@ Failures
 ```text
 Parallel Tool Calls     ✅ 已实现（Phase 13）
 Repository Map          ✅ 已实现（启动注入 + repo_map 工具）
-Semantic Code Search
+Semantic Code Search    ✅ 已实现（词法第一版：code_search + 每轮注入）
 RAG
 Context Caching
 Reflection             ✅ 已实现（有界自省 + reflection.* 事件）
@@ -694,6 +694,62 @@ agent:
 tree-sitter / 多语言精确符号（非 Go 仅列路径）
 语义 / embedding 排序（后续 Semantic Code Search）
 缓存落盘 / 跨进程共享（当前为进程内缓存，快速路径为 mtime+size）
+```
+
+---
+
+## Semantic Code Search（已实现 · 词法第一版）
+
+### 目标
+
+在 Repository Map 之上按查询做相关度检索：给定自然语言/符号查询，返回最相关的
+代码单元（路径 + 符号），既供模型按需调用，也在每轮请求前自动注入 top-K，
+减少「先 glob/grep 猜关键词」的探索成本。
+
+### 实现
+
+```text
+internal/repomap.Scan        导出：返回完整结构（不渲染/不预算），供索引构建复用解析缓存
+internal/codesearch          Index（= Searcher 实现的词法后端）
+  切块: Go 顶层符号（name/sig/kind/line）为一 chunk；非 Go 文件以路径为 chunk
+  分词: 小写 + 分隔符/驼峰切分；去停用词与 <2 字符
+  打分: BM25（k1=1.2, b=0.75），字段含 name(加权)/sig/kind/package/path
+  渲染: 受 max_tokens 约束的紧凑块，带命中词
+  Searcher 接口: Search(ctx, query, k) ([]Hit, error)  ← 预留 embedding 后端
+Agent.CodeSearch CodeSearchProvider（结构类型，无实现依赖）
+  Run 起始按 user 输入检索，成功注入 ctx（source=code_search），失败 best-effort
+code_search 工具            只读、可并行；参数 query / max_results（硬上限 15）
+/search 命令                /search <query> 打印命中与 matched 词
+```
+
+- 索引复用 repomap 的增量缓存（mtime+size），每轮重建成本低（实测个位数 ms）。
+- 空结果会清空 source，避免上一轮命中残留。
+
+### 可观测
+
+```text
+code_search.injected（query/hits/top/top_k/tokens/duration_ms/error）
+Context snapshot: source=code_search（pinned）
+工具 code_search 走 tool.* 事件（meta: results/top/duration_ms）
+```
+
+### 配置
+
+```yaml
+codesearch:
+  enabled: true
+  backend: lexical   # embedding 为预留扩展点
+  top_k: 6
+  max_tokens: 800
+```
+
+### 明确不做（第一版）
+
+```text
+embedding / 向量索引（接口已预留）
+函数体级切块与 AST 语义切分（当前以符号为单位）
+跨语言精确符号（非 Go 仅路径级检索）
+索引落盘 / 跨进程复用
 ```
 
 ---

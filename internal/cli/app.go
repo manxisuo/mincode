@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/manxisuo/mincode/internal/agent"
+	"github.com/manxisuo/mincode/internal/codesearch"
 	"github.com/manxisuo/mincode/internal/config"
 	"github.com/manxisuo/mincode/internal/ctxmgr"
 	"github.com/manxisuo/mincode/internal/instruction"
@@ -64,6 +65,7 @@ type App struct {
 	plans      *plan.Manager
 	repoMap    *repomap.Map
 	repoCache  *repomap.Cache
+	codeSearch *codesearch.Index
 	lastResult *agent.Result
 	out        io.Writer
 	echoTools  atomic.Bool
@@ -166,6 +168,19 @@ func NewApp(opts Options) (*App, error) {
 		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache})
 	}
 
+	var codeIdx *codesearch.Index
+	if cfg.CodeSearchEnabled() {
+		if cfg.CodeSearch.Backend != "" && cfg.CodeSearch.Backend != codesearch.BackendLexical {
+			_ = recorder.Close()
+			return nil, fmt.Errorf("unknown codesearch backend %q", cfg.CodeSearch.Backend)
+		}
+		codeIdx = codesearch.New(workspace, codesearch.Options{
+			MaxTokens: cfg.CodeSearch.MaxTokens,
+			Cache:     repoCache,
+		})
+		registry.Register(&tools.CodeSearch{Searcher: codeIdx, DefaultK: cfg.CodeSearch.TopK})
+	}
+
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
 	ag := agent.NewWithCompress(provider, registry, bus, sessionID, cfg.Agent.MaxSteps, sysPrompt, cfg.Agent.TokenBudget, cfg.Agent.CompressAt)
 	if cfg.Agent.ParallelTools != nil {
@@ -177,6 +192,10 @@ func NewApp(opts Options) (*App, error) {
 		ag.Reflection = *cfg.Agent.Reflection
 	}
 	ag.MaxReflections = cfg.Agent.MaxReflections
+	if codeIdx != nil {
+		ag.CodeSearch = codeIdx
+		ag.CodeSearchTopK = cfg.CodeSearch.TopK
+	}
 
 	instrLoader, err := instruction.NewLoader(workspace)
 	if err != nil {
@@ -197,21 +216,22 @@ func NewApp(opts Options) (*App, error) {
 	sessions := session.NewStore(layout.SessionsDir)
 
 	app := &App{
-		cfg:       cfg,
-		provider:  provider,
-		agent:     ag,
-		bus:       bus,
-		recorder:  recorder,
-		metrics:   metrics,
-		sessions:  sessions,
-		sessionID: sessionID,
-		workspace: workspace,
-		instr:     instrLoader,
-		skills:    skillLoader,
-		mem:       memStore,
-		plans:     plan.NewManager(),
-		repoCache: repoCache,
-		out:       os.Stdout,
+		cfg:        cfg,
+		provider:   provider,
+		agent:      ag,
+		bus:        bus,
+		recorder:   recorder,
+		metrics:    metrics,
+		sessions:   sessions,
+		sessionID:  sessionID,
+		workspace:  workspace,
+		instr:      instrLoader,
+		skills:     skillLoader,
+		mem:        memStore,
+		plans:      plan.NewManager(),
+		repoCache:  repoCache,
+		codeSearch: codeIdx,
+		out:        os.Stdout,
 	}
 
 	registry.Register(&tools.MemoryAdd{
@@ -697,7 +717,7 @@ func newStdinScanner() *bufio.Scanner {
 }
 
 func (a *App) toolNames() []string {
-	return []string{"read_file", "list_dir", "glob", "grep", "repo_map", "write_file", "edit_file", "shell", "memory_add"}
+	return []string{"read_file", "list_dir", "glob", "grep", "repo_map", "code_search", "write_file", "edit_file", "shell", "memory_add"}
 }
 
 // reportTurnError prints a user-facing message for a failed/cancelled turn.
@@ -910,6 +930,7 @@ func (a *App) handleCommand(ctx context.Context, line string) (quit bool) {
   /memory            show project memory (MEMORY.md)
   /memory add <fact> append a durable fact to MEMORY.md
   /repomap           show the repository map injected into context
+  /search <query>    lexical code search over paths/symbols/signatures
   /export [path]     export conversation as Markdown (default: exports/<session-id>.md)
   /plan <goal>       draft a plan for a task
   /plan              show current plan
@@ -939,6 +960,8 @@ Trace file:
 		a.handleMemoryCommand(fields[1:])
 	case "/repomap":
 		a.printRepoMap()
+	case "/search":
+		a.handleSearchCommand(fields[1:])
 	case "/export":
 		a.handleExportCommand(fields[1:])
 	case "/plan":
@@ -1212,6 +1235,43 @@ func (a *App) printRepoMap() {
 		gray(fmt.Sprintf("%d files, %d symbols, ~%d tokens, scanned %d, %dms",
 			len(m.Files), countRepoMapSymbols(m), m.Tokens, m.Scanned, m.BuildMS)), trunc)
 	fmt.Fprintln(a.out, m.Text)
+	fmt.Fprintln(a.out)
+}
+
+// handleSearchCommand: /search <query>
+func (a *App) handleSearchCommand(args []string) {
+	query := strings.TrimSpace(strings.Join(args, " "))
+	fmt.Fprintln(a.out)
+	if query == "" {
+		fmt.Fprintf(a.out, "%s usage: /search <query>\n\n", yellow("usage:"))
+		return
+	}
+	if a.codeSearch == nil {
+		fmt.Fprintf(a.out, "%s\n\n", yellow("code search is disabled (codesearch.enabled: false)"))
+		return
+	}
+	hits, err := a.codeSearch.Search(context.Background(), query, 8)
+	if err != nil {
+		fmt.Fprintf(a.out, "%s %v\n\n", red("error:"), err)
+		return
+	}
+	if len(hits) == 0 {
+		fmt.Fprintf(a.out, "%s %s\n\n", yellow("no matches for"), bold(query))
+		return
+	}
+	fmt.Fprintf(a.out, "%s  %s\n\n", bold("Code search"),
+		gray(fmt.Sprintf("%d hit(s) for %q", len(hits), query)))
+	for _, h := range hits {
+		loc := h.Path
+		if h.Line > 0 {
+			loc = fmt.Sprintf("%s:%d", h.Path, h.Line)
+		}
+		fmt.Fprintf(a.out, "%s  %s  %s\n",
+			padCol(cyan(fmt.Sprintf("%.2f", h.Score)), 8), padCol(loc, 46), h.Text)
+		if len(h.Matched) > 0 {
+			fmt.Fprintf(a.out, "        %s\n", gray("matched: "+strings.Join(h.Matched, " ")))
+		}
+	}
 	fmt.Fprintln(a.out)
 }
 

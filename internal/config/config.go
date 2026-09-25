@@ -2,11 +2,25 @@ package config
 
 // Config is the runtime configuration for mincode.
 type Config struct {
-	Provider  ProviderConfig  `yaml:"provider"`
-	Agent     AgentConfig     `yaml:"agent"`
-	Memory    MemoryConfig    `yaml:"memory"`
-	Data      DataConfig      `yaml:"data"`
-	WebSearch WebSearchConfig `yaml:"websearch"`
+	Provider   ProviderConfig   `yaml:"provider"`
+	Agent      AgentConfig      `yaml:"agent"`
+	Memory     MemoryConfig     `yaml:"memory"`
+	Data       DataConfig       `yaml:"data"`
+	WebSearch  WebSearchConfig  `yaml:"websearch"`
+	CodeSearch CodeSearchConfig `yaml:"codesearch"`
+}
+
+// CodeSearchConfig controls query-relevant lexical code retrieval.
+type CodeSearchConfig struct {
+	// Enabled turns on per-turn top-K injection and the code_search tool.
+	Enabled *bool `yaml:"enabled"`
+	// Backend is the retrieval backend. "lexical" is implemented; an embedding
+	// backend is reserved for later.
+	Backend string `yaml:"backend"`
+	// TopK caps injected/returned results (0 = default 6).
+	TopK int `yaml:"top_k"`
+	// MaxTokens caps the injected context block (0 = default 800).
+	MaxTokens int `yaml:"max_tokens"`
 }
 
 // WebSearchConfig selects and configures the web search backend.
@@ -110,6 +124,12 @@ func Default() Config {
 		Data: DataConfig{
 			Location: "global",
 		},
+		CodeSearch: CodeSearchConfig{
+			Enabled:   &on,
+			Backend:   "lexical",
+			TopK:      6,
+			MaxTokens: 800,
+		},
 	}
 }
 
@@ -118,6 +138,7 @@ const DefaultSystemPrompt = `You are Min Code Agent, a coding assistant working 
 
 You have tools to explore and modify the repository:
 - repo_map: compact structural map (paths + Go top-level symbols); use it to orient before reading
+- code_search: lexical relevance search over paths/symbols/signatures; find where something lives
 - list_dir / glob / grep / read_file: inspect code
 - write_file / edit_file: create or modify files (requires user approval)
 - shell: run commands (go test, git status allow; destructive commands denied)
@@ -150,6 +171,14 @@ func (c Config) RepoMapEnabled() bool {
 		return true
 	}
 	return *c.Agent.RepoMap
+}
+
+// CodeSearchEnabled reports whether query-relevant code retrieval is active.
+func (c Config) CodeSearchEnabled() bool {
+	if c.CodeSearch.Enabled == nil {
+		return true
+	}
+	return *c.CodeSearch.Enabled
 }
 
 // PlatformShellHint returns OS-specific shell guidance for the system prompt.

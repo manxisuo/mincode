@@ -54,17 +54,18 @@ type DefaultPolicy struct {
 func NewDefaultPolicy() *DefaultPolicy {
 	return &DefaultPolicy{
 		Overrides: map[string]Level{
-			"read_file":  Allow,
-			"list_dir":   Allow,
-			"glob":       Allow,
-			"grep":       Allow,
-			"repo_map":   Allow, // read-only structural map of the workspace
-			"web_search": Allow, // read-only network query; backend must be configured
-			"web_fetch":  Allow, // read-only URL fetch; SSRF guard blocks private targets
-			"write_file": Ask,
-			"edit_file":  Ask,
-			"shell":      Ask, // Phase 5; reserved
-			"memory_add": Ask, // durable fact write — user confirms
+			"read_file":   Allow,
+			"list_dir":    Allow,
+			"glob":        Allow,
+			"grep":        Allow,
+			"repo_map":    Allow, // read-only structural map of the workspace
+			"code_search": Allow, // read-only lexical code retrieval
+			"web_search":  Allow, // read-only network query; backend must be configured
+			"web_fetch":   Allow, // read-only URL fetch; SSRF guard blocks private targets
+			"write_file":  Ask,
+			"edit_file":   Ask,
+			"shell":       Ask, // Phase 5; reserved
+			"memory_add":  Ask, // durable fact write — user confirms
 		},
 	}
 }

@@ -59,6 +59,13 @@ function previewData(data?: Record<string, unknown>): string {
     const reason = data.reason ? ` · ${data.reason}` : "";
     return `${data.files} files ~${data.tokens}t · ${data.build_ms}ms${cache}${trunc}${reason}`;
   }
+  if (data.query != null && data.hits != null && data.top_k != null) {
+    const arr = Array.isArray(data.top) ? (data.top as unknown[]) : [];
+    const top = arr.length ? ` · ${String(arr[0])}` : "";
+    const tok = data.tokens != null ? ` · ${data.tokens}t` : "";
+    const ms = data.duration_ms != null ? ` · ${data.duration_ms}ms` : "";
+    return `“${String(data.query)}” hits=${data.hits}${tok}${ms}${top}`;
+  }
   if (data.estimated_prompt_tokens != null && data.input_tokens != null) {
     return `est=${data.estimated_prompt_tokens} provider=${data.input_tokens} Δ=${data.prompt_token_delta ?? "?"}`;
   }

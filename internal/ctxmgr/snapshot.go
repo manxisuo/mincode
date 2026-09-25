@@ -17,6 +17,7 @@ const (
 	SourceSkills       Source = "skills"
 	SourceMemory       Source = "memory"
 	SourceRepoMap      Source = "repo_map"
+	SourceCodeSearch   Source = "code_search"
 	SourceHistory      Source = "history"
 	SourceToolResult   Source = "tool_result"
 	SourceUserInput    Source = "user_input"

@@ -57,6 +57,9 @@ const (
 	// EventRepoMapBuilt is emitted when a repository map is built for context
 	// (startup injection) or on demand (repo_map tool).
 	EventRepoMapBuilt EventType = "repo_map.built"
+	// EventCodeSearchInjected is emitted when query-relevant code is retrieved
+	// and pinned into context for the current turn.
+	EventCodeSearchInjected EventType = "code_search.injected"
 
 	EventPlanCreated      EventType = "plan.created"
 	EventPlanApproved     EventType = "plan.approved"
@@ -344,6 +347,17 @@ type RepoMapData struct {
 	// (reused unchanged files vs re-parsed files). Always emitted.
 	CacheHits   int `json:"cache_hits"`
 	CacheMisses int `json:"cache_misses"`
+}
+
+// CodeSearchData is payload for code_search.injected.
+type CodeSearchData struct {
+	Query      string   `json:"query"`
+	Hits       int      `json:"hits"`
+	Top        []string `json:"top,omitempty"`
+	TopK       int      `json:"top_k,omitempty"`
+	Tokens     int      `json:"tokens,omitempty"`
+	DurationMS int64    `json:"duration_ms,omitempty"`
+	Error      string   `json:"error,omitempty"`
 }
 
 // MemoryEventData is payload for memory.retrieved / memory.updated.

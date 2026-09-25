@@ -194,6 +194,32 @@ func TestRepoMapConfig(t *testing.T) {
 	}
 }
 
+func TestCodeSearchConfig(t *testing.T) {
+	def := Default()
+	if !def.CodeSearchEnabled() {
+		t.Fatal("codesearch should default on")
+	}
+	if def.CodeSearch.Backend != "lexical" || def.CodeSearch.TopK != 6 || def.CodeSearch.MaxTokens != 800 {
+		t.Fatalf("codesearch defaults = %+v", def.CodeSearch)
+	}
+
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	content := "provider:\n  type: fake\ncodesearch:\n  enabled: false\n  backend: lexical\n  top_k: 3\n  max_tokens: 200\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CodeSearchEnabled() {
+		t.Fatal("codesearch should be disabled from yaml")
+	}
+	if cfg.CodeSearch.TopK != 3 || cfg.CodeSearch.MaxTokens != 200 {
+		t.Fatalf("codesearch = %+v", cfg.CodeSearch)
+	}
+}
+
 func TestReflectionConfig(t *testing.T) {
 	// Default: off, max reflections normalized to 2.
 	def := Default()

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/manxisuo/mincode/internal/agent"
+	"github.com/manxisuo/mincode/internal/codesearch"
 	"github.com/manxisuo/mincode/internal/config"
 	"github.com/manxisuo/mincode/internal/experiment"
 	"github.com/manxisuo/mincode/internal/instruction"
@@ -136,6 +137,18 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache})
 	}
 
+	var codeIdx *codesearch.Index
+	if cfg.CodeSearchEnabled() {
+		if cfg.CodeSearch.Backend != "" && cfg.CodeSearch.Backend != codesearch.BackendLexical {
+			return fmt.Errorf("unknown codesearch backend %q", cfg.CodeSearch.Backend)
+		}
+		codeIdx = codesearch.New(workspace, codesearch.Options{
+			MaxTokens: cfg.CodeSearch.MaxTokens,
+			Cache:     repoCache,
+		})
+		registry.Register(&tools.CodeSearch{Searcher: codeIdx, DefaultK: cfg.CodeSearch.TopK})
+	}
+
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)
 	ag := agent.NewWithCompress(provider, registry, bus, sessionID, cfg.Agent.MaxSteps,
 		sysPrompt, cfg.Agent.TokenBudget, cfg.Agent.CompressAt)
@@ -148,6 +161,10 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		ag.Reflection = *cfg.Agent.Reflection
 	}
 	ag.MaxReflections = cfg.Agent.MaxReflections
+	if codeIdx != nil {
+		ag.CodeSearch = codeIdx
+		ag.CodeSearchTopK = cfg.CodeSearch.TopK
+	}
 	// Approver set after server.New so pending requests can reach the web UI.
 
 	registry.Register(&tools.MemoryAdd{

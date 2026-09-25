@@ -151,6 +151,19 @@ func normalize(cfg *Config) {
 	if cfg.Agent.RepoMapTokens <= 0 {
 		cfg.Agent.RepoMapTokens = 1500
 	}
+	if cfg.CodeSearch.Enabled == nil {
+		on := true
+		cfg.CodeSearch.Enabled = &on
+	}
+	if cfg.CodeSearch.Backend == "" {
+		cfg.CodeSearch.Backend = "lexical"
+	}
+	if cfg.CodeSearch.TopK <= 0 {
+		cfg.CodeSearch.TopK = 6
+	}
+	if cfg.CodeSearch.MaxTokens <= 0 {
+		cfg.CodeSearch.MaxTokens = 800
+	}
 	if cfg.Data.Location == "" {
 		cfg.Data.Location = "global"
 	}

@@ -206,9 +206,46 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 		opts.MaxFiles = DefaultMaxFiles
 	}
 
+	m, entries, err := scanEntries(ctx, workspace, opts)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		m.Text = "Repository map: no code files found" + subpathNote(opts.Subpath) + ".\n"
+		m.Tokens = ctxmgr.EstimateTokens(m.Text)
+		m.BuildMS = time.Since(start).Milliseconds()
+		return m, nil
+	}
+	if len(entries) > opts.MaxFiles {
+		entries = entries[:opts.MaxFiles]
+		m.Truncated = true
+	}
+
+	m.Text = render(m, entries, opts.MaxTokens)
+	m.Tokens = ctxmgr.EstimateTokens(m.Text)
+	m.BuildMS = time.Since(start).Milliseconds()
+	return m, nil
+}
+
+// Scan returns the full ranked file structure of the workspace without
+// rendering or token budgeting. Index builders (e.g. code search) use this;
+// prompt assembly should use Build. The returned entries are not capped by
+// MaxFiles.
+func Scan(ctx context.Context, workspace string, opts Options) (*Map, []FileEntry, error) {
+	start := time.Now()
+	m, entries, err := scanEntries(ctx, workspace, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	m.BuildMS = time.Since(start).Milliseconds()
+	return m, entries, nil
+}
+
+// scanEntries does the shared work of Build/Scan: resolve, walk, parse, rank.
+func scanEntries(ctx context.Context, workspace string, opts Options) (*Map, []FileEntry, error) {
 	base, err := filepath.Abs(workspace)
 	if err != nil {
-		return nil, fmt.Errorf("resolve workspace: %w", err)
+		return nil, nil, fmt.Errorf("resolve workspace: %w", err)
 	}
 	base = filepath.Clean(base)
 
@@ -216,11 +253,11 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 	if opts.Subpath != "" && opts.Subpath != "." {
 		abs, err := inside(base, opts.Subpath)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		info, err := os.Stat(abs)
 		if err != nil {
-			return nil, fmt.Errorf("repo_map path %q: %w", opts.Subpath, err)
+			return nil, nil, fmt.Errorf("repo_map path %q: %w", opts.Subpath, err)
 		}
 		if !info.IsDir() {
 			abs = filepath.Dir(abs)
@@ -232,15 +269,12 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 
 	candidates, scanned, skipped, err := scanFiles(ctx, base, scanRoot)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	m.Scanned = scanned
 	m.Skipped = skipped
 	if len(candidates) == 0 {
-		m.Text = "Repository map: no code files found" + subpathNote(opts.Subpath) + ".\n"
-		m.Tokens = ctxmgr.EstimateTokens(m.Text)
-		m.BuildMS = time.Since(start).Milliseconds()
-		return m, nil
+		return m, nil, nil
 	}
 
 	entries := make([]FileEntry, 0, len(candidates))
@@ -248,7 +282,7 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 	hitsBefore, missesBefore := opts.Cache.stats()
 	for _, rf := range candidates {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		var e FileEntry
 		var idents map[string]int
@@ -279,18 +313,10 @@ func Build(ctx context.Context, workspace string, opts Options) (*Map, error) {
 		}
 		return entries[i].Path < entries[j].Path
 	})
-	if len(entries) > opts.MaxFiles {
-		entries = entries[:opts.MaxFiles]
-		m.Truncated = true
-	}
-
-	m.Text = render(m, entries, opts.MaxTokens)
-	m.Tokens = ctxmgr.EstimateTokens(m.Text)
 	hitsAfter, missesAfter := opts.Cache.stats()
 	m.CacheHits = hitsAfter - hitsBefore
 	m.CacheMisses = missesAfter - missesBefore
-	m.BuildMS = time.Since(start).Milliseconds()
-	return m, nil
+	return m, entries, nil
 }
 
 // scanFiles collects code candidates under scanRoot. Rel paths are relative to

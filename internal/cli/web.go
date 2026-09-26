@@ -144,7 +144,7 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 			return err
 		}
 		codeIdx = s
-		registry.Register(&tools.CodeSearch{Searcher: s, DefaultK: cfg.CodeSearch.TopK})
+		registry.Register(&tools.CodeSearch{Searcher: s, DefaultK: cfg.CodeSearch.TopK, MaxTokens: cfg.CodeSearch.MaxTokens})
 	}
 
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)

@@ -176,7 +176,7 @@ func NewApp(opts Options) (*App, error) {
 			return nil, err
 		}
 		codeIdx = s
-		registry.Register(&tools.CodeSearch{Searcher: s, DefaultK: cfg.CodeSearch.TopK})
+		registry.Register(&tools.CodeSearch{Searcher: s, DefaultK: cfg.CodeSearch.TopK, MaxTokens: cfg.CodeSearch.MaxTokens})
 	}
 
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)

@@ -63,6 +63,46 @@ func TestCodeSearchToolValidation(t *testing.T) {
 	}
 }
 
+type stubSearcher struct{ hits []codesearch.Hit }
+
+func (s stubSearcher) Search(context.Context, string, int) ([]codesearch.Hit, error) {
+	return s.hits, nil
+}
+
+func TestCodeSearchToolHonorsMaxTokens(t *testing.T) {
+	hits := make([]codesearch.Hit, 0, 8)
+	for i := 0; i < 8; i++ {
+		hits = append(hits, codesearch.Hit{
+			Chunk: codesearch.Chunk{
+				Path: "pkg/file.go",
+				Kind: "func",
+				Name: "F",
+				Text: "func VeryLongFunctionNameThatConsumesTokens()",
+				Line: i + 1,
+			},
+			Score:   1.0,
+			Matched: []string{"alpha", "beta", "gamma", "delta"},
+		})
+	}
+	tool := &CodeSearch{Searcher: stubSearcher{hits: hits}, DefaultK: 8, MaxTokens: 40}
+	res, err := tool.Execute(context.Background(), mustJSON(t, map[string]any{"query": "x"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Content, "more match") {
+		t.Fatalf("expected truncation under small MaxTokens:\n%s", res.Content)
+	}
+
+	tool.MaxTokens = 5000
+	res, err = tool.Execute(context.Background(), mustJSON(t, map[string]any{"query": "x"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(res.Content, "more match") {
+		t.Fatalf("unexpected truncation under large MaxTokens:\n%s", res.Content)
+	}
+}
+
 func TestCodeSearchToolCancelled(t *testing.T) {
 	ws := newWS(t)
 	ix := codesearch.New(ws.Root(), codesearch.Options{})

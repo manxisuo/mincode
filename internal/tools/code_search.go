@@ -21,6 +21,8 @@ type CodeSearch struct {
 	Searcher codesearch.Searcher
 	// DefaultK caps results when the model does not specify one.
 	DefaultK int
+	// MaxTokens caps the rendered output block (0 = backend default).
+	MaxTokens int
 }
 
 func (t *CodeSearch) Name() string { return "code_search" }
@@ -102,7 +104,7 @@ func (t *CodeSearch) Execute(ctx context.Context, raw json.RawMessage) (Result, 
 		}
 	}
 	return Result{
-		Content: codesearch.Render(query, hits, 0),
+		Content: codesearch.Render(query, hits, t.MaxTokens),
 		Meta: map[string]any{
 			"query":       query,
 			"results":     len(hits),

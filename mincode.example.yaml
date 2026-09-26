@@ -192,8 +192,8 @@ codesearch:
   enabled: true
 
   # 检索后端。
-  #   lexical — 基于路径/包名/符号名/签名的 BM25（零依赖、确定性、可解释）
-  # 说明: embedding 后端为预留扩展点（Searcher 接口），当前未实现。
+  #   lexical   — 基于路径/包名/符号名/签名的 BM25（零依赖、确定性、可解释）
+  #   embedding — 向量语义检索（需配置下方 embedding 段；chunk 含源码摘录）
   # 默认: lexical
   backend: lexical
 
@@ -202,6 +202,42 @@ codesearch:
 
   # 注入上下文块的大小上限（估算 token）。默认: 800
   max_tokens: 800
+
+# ---------------------------------------------------------------------------
+# embedding：文本向量后端（codesearch.backend=embedding 时使用）
+# ---------------------------------------------------------------------------
+embedding:
+  # 后端类型。
+  #   ""                 — 未配置（backend=lexical 时无需）
+  #   fake               — 确定性哈希嵌入，离线测试/演示，不访问网络
+  #   openai-compatible  — 任意 OpenAI 兼容 /embeddings（需 api_key）
+  # ENV: MINCODE_EMBEDDING_TYPE
+  # 默认: ""（禁用）
+  type: ""
+
+  # API Key。建议用环境变量 MINCODE_EMBEDDING_API_KEY。
+  # 未设置时回退到 provider.api_key。
+  # 默认: 空
+  # api_key: sk-...
+
+  # 端点根地址（不含 /embeddings）。未设置时回退到 provider.base_url。
+  # ENV: MINCODE_EMBEDDING_BASE_URL
+  # 默认: 空
+  # base_url: https://api.openai.com/v1
+
+  # 嵌入模型名（type=openai-compatible 时**必填**；不会复用 provider.model）。
+  # ENV: MINCODE_EMBEDDING_MODEL
+  # 默认: 空
+  # model: text-embedding-3-small
+
+  # fake 后端的向量维度。默认: 0 → 256
+  # dim: 256
+
+  # 单批请求超时（秒）。默认: 60
+  timeout_sec: 60
+
+  # 每次请求的最大输入数。默认: 64
+  batch_size: 64
 
 # ---------------------------------------------------------------------------
 # 本文件未覆盖、但运行时会用到的路径（非 YAML 配置，仅说明）

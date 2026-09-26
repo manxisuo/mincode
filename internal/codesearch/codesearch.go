@@ -54,6 +54,14 @@ type Searcher interface {
 	Search(ctx context.Context, query string, k int) ([]Hit, error)
 }
 
+// Retriever is the full search interface used for context injection: ranking
+// plus a rendered block, with a backend label for observability.
+type Retriever interface {
+	Searcher
+	SearchContext(ctx context.Context, query string, k int) (text string, summary []string, err error)
+	Backend() string
+}
+
 // Options configures an Index.
 type Options struct {
 	// MaxTokens caps a rendered context block (0 = default 800).
@@ -87,6 +95,9 @@ func New(workspace string, opts Options) *Index {
 		cache:     opts.Cache,
 	}
 }
+
+// Backend identifies the retrieval backend for observability.
+func (ix *Index) Backend() string { return BackendLexical }
 
 // Snapshot is an immutable built index.
 type Snapshot struct {

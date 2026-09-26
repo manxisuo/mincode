@@ -137,16 +137,14 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache})
 	}
 
-	var codeIdx *codesearch.Index
+	var codeIdx codesearch.Retriever
 	if cfg.CodeSearchEnabled() {
-		if cfg.CodeSearch.Backend != "" && cfg.CodeSearch.Backend != codesearch.BackendLexical {
-			return fmt.Errorf("unknown codesearch backend %q", cfg.CodeSearch.Backend)
+		s, err := buildCodeSearcher(cfg, workspace, repoCache)
+		if err != nil {
+			return err
 		}
-		codeIdx = codesearch.New(workspace, codesearch.Options{
-			MaxTokens: cfg.CodeSearch.MaxTokens,
-			Cache:     repoCache,
-		})
-		registry.Register(&tools.CodeSearch{Searcher: codeIdx, DefaultK: cfg.CodeSearch.TopK})
+		codeIdx = s
+		registry.Register(&tools.CodeSearch{Searcher: s, DefaultK: cfg.CodeSearch.TopK})
 	}
 
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)

@@ -65,7 +65,7 @@ type App struct {
 	plans      *plan.Manager
 	repoMap    *repomap.Map
 	repoCache  *repomap.Cache
-	codeSearch *codesearch.Index
+	codeSearch codesearch.Retriever
 	lastResult *agent.Result
 	out        io.Writer
 	echoTools  atomic.Bool
@@ -168,17 +168,15 @@ func NewApp(opts Options) (*App, error) {
 		registry.Register(&tools.RepoMap{WS: ws, MaxTokens: cfg.Agent.RepoMapTokens, Cache: repoCache})
 	}
 
-	var codeIdx *codesearch.Index
+	var codeIdx codesearch.Retriever
 	if cfg.CodeSearchEnabled() {
-		if cfg.CodeSearch.Backend != "" && cfg.CodeSearch.Backend != codesearch.BackendLexical {
+		s, err := buildCodeSearcher(cfg, workspace, repoCache)
+		if err != nil {
 			_ = recorder.Close()
-			return nil, fmt.Errorf("unknown codesearch backend %q", cfg.CodeSearch.Backend)
+			return nil, err
 		}
-		codeIdx = codesearch.New(workspace, codesearch.Options{
-			MaxTokens: cfg.CodeSearch.MaxTokens,
-			Cache:     repoCache,
-		})
-		registry.Register(&tools.CodeSearch{Searcher: codeIdx, DefaultK: cfg.CodeSearch.TopK})
+		codeIdx = s
+		registry.Register(&tools.CodeSearch{Searcher: s, DefaultK: cfg.CodeSearch.TopK})
 	}
 
 	sysPrompt := cfg.Agent.SystemPrompt + config.PlatformShellHint(runtime.GOOS)

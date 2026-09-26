@@ -8,6 +8,25 @@ type Config struct {
 	Data       DataConfig       `yaml:"data"`
 	WebSearch  WebSearchConfig  `yaml:"websearch"`
 	CodeSearch CodeSearchConfig `yaml:"codesearch"`
+	Embedding  EmbeddingConfig  `yaml:"embedding"`
+}
+
+// EmbeddingConfig selects a text-embedding backend for semantic code search.
+type EmbeddingConfig struct {
+	// Type is "fake" (offline), "openai-compatible", or "" (disabled).
+	Type string `yaml:"type"`
+	// BaseURL overrides the /embeddings endpoint root (default provider base_url).
+	BaseURL string `yaml:"base_url"`
+	// APIKey authenticates the endpoint (prefer MINCODE_EMBEDDING_API_KEY).
+	APIKey string `yaml:"api_key"`
+	// Model is the embedding model name.
+	Model string `yaml:"model"`
+	// Dim is the vector dimension for the fake backend (0 = 256).
+	Dim int `yaml:"dim"`
+	// TimeoutSec is the per-batch timeout (0 = 60).
+	TimeoutSec int `yaml:"timeout_sec"`
+	// BatchSize caps inputs per request (0 = 64).
+	BatchSize int `yaml:"batch_size"`
 }
 
 // CodeSearchConfig controls query-relevant lexical code retrieval.
@@ -129,6 +148,10 @@ func Default() Config {
 			Backend:   "lexical",
 			TopK:      6,
 			MaxTokens: 800,
+		},
+		Embedding: EmbeddingConfig{
+			TimeoutSec: 60,
+			BatchSize:  64,
 		},
 	}
 }

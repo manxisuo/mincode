@@ -64,7 +64,8 @@ function previewData(data?: Record<string, unknown>): string {
     const top = arr.length ? ` · ${String(arr[0])}` : "";
     const tok = data.tokens != null ? ` · ${data.tokens}t` : "";
     const ms = data.duration_ms != null ? ` · ${data.duration_ms}ms` : "";
-    return `“${String(data.query)}” hits=${data.hits}${tok}${ms}${top}`;
+    const backend = data.backend ? ` · ${data.backend}` : "";
+    return `“${String(data.query)}” hits=${data.hits}${backend}${tok}${ms}${top}`;
   }
   if (data.estimated_prompt_tokens != null && data.input_tokens != null) {
     return `est=${data.estimated_prompt_tokens} provider=${data.input_tokens} Δ=${data.prompt_token_delta ?? "?"}`;

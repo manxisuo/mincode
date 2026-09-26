@@ -139,6 +139,9 @@ type Symbol struct {
 	Name string `json:"name"`
 	Sig  string `json:"sig,omitempty"`
 	Line int    `json:"line,omitempty"`
+	// EndLine bounds the declaration for source-excerpt consumers (code search);
+	// not serialized into the repo-map response.
+	EndLine int `json:"-"`
 }
 
 // ScoreBreakdown explains how one file's rank score was computed. It lets the
@@ -423,10 +426,11 @@ func extractSymbols(fset *token.FileSet, f *ast.File) []Symbol {
 				kind = "method"
 			}
 			out = append(out, Symbol{
-				Kind: kind,
-				Name: name,
-				Sig:  compact("func " + name + sigOf(fset, d.Type)),
-				Line: fset.Position(d.Pos()).Line,
+				Kind:    kind,
+				Name:    name,
+				Sig:     compact("func " + name + sigOf(fset, d.Type)),
+				Line:    fset.Position(d.Pos()).Line,
+				EndLine: fset.Position(d.End()).Line,
 			})
 		case *ast.GenDecl:
 			switch d.Tok {
@@ -437,9 +441,10 @@ func extractSymbols(fset *token.FileSet, f *ast.File) []Symbol {
 						continue
 					}
 					out = append(out, Symbol{
-						Kind: kindOfType(ts.Type),
-						Name: ts.Name.Name,
-						Line: fset.Position(ts.Pos()).Line,
+						Kind:    kindOfType(ts.Type),
+						Name:    ts.Name.Name,
+						Line:    fset.Position(ts.Pos()).Line,
+						EndLine: fset.Position(ts.End()).Line,
 					})
 				}
 			case token.CONST, token.VAR:
@@ -453,7 +458,12 @@ func extractSymbols(fset *token.FileSet, f *ast.File) []Symbol {
 						if n.Name == "_" {
 							continue
 						}
-						out = append(out, Symbol{Kind: kind, Name: n.Name, Line: fset.Position(n.Pos()).Line})
+						out = append(out, Symbol{
+							Kind:    kind,
+							Name:    n.Name,
+							Line:    fset.Position(n.Pos()).Line,
+							EndLine: fset.Position(vs.End()).Line,
+						})
 					}
 				}
 			}

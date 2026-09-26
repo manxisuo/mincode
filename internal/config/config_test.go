@@ -220,6 +220,45 @@ func TestCodeSearchConfig(t *testing.T) {
 	}
 }
 
+func TestEmbeddingConfig(t *testing.T) {
+	def := Default()
+	if def.Embedding.Type != "" {
+		t.Fatalf("embedding should default disabled: %+v", def.Embedding)
+	}
+	if def.Embedding.BatchSize != 64 || def.Embedding.TimeoutSec != 60 {
+		t.Fatalf("embedding normalize = %+v", def.Embedding)
+	}
+
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	content := "provider:\n  type: fake\ncodesearch:\n  backend: embedding\nembedding:\n  type: fake\n  dim: 64\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CodeSearch.Backend != "embedding" || cfg.Embedding.Type != "fake" || cfg.Embedding.Dim != 64 {
+		t.Fatalf("cfg = %+v / %+v", cfg.CodeSearch, cfg.Embedding)
+	}
+}
+
+func TestEmbeddingEnvOverride(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mincode.yaml")
+	if err := os.WriteFile(path, []byte("provider:\n  type: fake\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MINCODE_EMBEDDING_TYPE", "fake")
+	t.Setenv("MINCODE_EMBEDDING_MODEL", "env-embed")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Embedding.Type != "fake" || cfg.Embedding.Model != "env-embed" {
+		t.Fatalf("env override = %+v", cfg.Embedding)
+	}
+}
+
 func TestReflectionConfig(t *testing.T) {
 	// Default: off, max reflections normalized to 2.
 	def := Default()

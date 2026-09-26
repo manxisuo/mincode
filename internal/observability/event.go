@@ -352,6 +352,7 @@ type RepoMapData struct {
 // CodeSearchData is payload for code_search.injected.
 type CodeSearchData struct {
 	Query      string   `json:"query"`
+	Backend    string   `json:"backend,omitempty"` // lexical | embedding
 	Hits       int      `json:"hits"`
 	Top        []string `json:"top,omitempty"`
 	TopK       int      `json:"top_k,omitempty"`

@@ -73,6 +73,33 @@ func TestAgentInjectsCodeSearch(t *testing.T) {
 	}
 }
 
+type stubBackendCodeSearch struct{ stubCodeSearch }
+
+func (s *stubBackendCodeSearch) Backend() string { return "embedding" }
+
+func TestAgentCodeSearchBackendReported(t *testing.T) {
+	fake := llm.NewFakeProvider("m", "final")
+	ag := newAgentWithFake(t, fake)
+	ag.CodeSearch = &stubBackendCodeSearch{stubCodeSearch{text: "Relevant code:\n  a.go", summary: []string{"a.go 1.0"}}}
+
+	var events []observability.Event
+	ag.Bus.Subscribe(func(e observability.Event) { events = append(events, e) })
+	if _, err := ag.Run(context.Background(), "q"); err != nil {
+		t.Fatal(err)
+	}
+	got := ""
+	for _, e := range events {
+		if e.Type == observability.EventCodeSearchInjected {
+			if d, ok := e.Data.(observability.CodeSearchData); ok {
+				got = d.Backend
+			}
+		}
+	}
+	if got != "embedding" {
+		t.Fatalf("backend = %q, want embedding", got)
+	}
+}
+
 func TestAgentClearsStaleCodeSearch(t *testing.T) {
 	fake := llm.NewFakeProvider("m", "final")
 	ag := newAgentWithFake(t, fake)

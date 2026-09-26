@@ -89,6 +89,18 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("MINCODE_WEBSEARCH_BASE_URL"); v != "" {
 		cfg.WebSearch.BaseURL = v
 	}
+	if v := os.Getenv("MINCODE_EMBEDDING_TYPE"); v != "" {
+		cfg.Embedding.Type = v
+	}
+	if v := os.Getenv("MINCODE_EMBEDDING_API_KEY"); v != "" {
+		cfg.Embedding.APIKey = v
+	}
+	if v := os.Getenv("MINCODE_EMBEDDING_BASE_URL"); v != "" {
+		cfg.Embedding.BaseURL = v
+	}
+	if v := os.Getenv("MINCODE_EMBEDDING_MODEL"); v != "" {
+		cfg.Embedding.Model = v
+	}
 }
 
 func firstEnv(keys ...string) string {
@@ -163,6 +175,12 @@ func normalize(cfg *Config) {
 	}
 	if cfg.CodeSearch.MaxTokens <= 0 {
 		cfg.CodeSearch.MaxTokens = 800
+	}
+	if cfg.Embedding.TimeoutSec <= 0 {
+		cfg.Embedding.TimeoutSec = 60
+	}
+	if cfg.Embedding.BatchSize <= 0 {
+		cfg.Embedding.BatchSize = 64
 	}
 	if cfg.Data.Location == "" {
 		cfg.Data.Location = "global"

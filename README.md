@@ -94,7 +94,7 @@ Context:
   token budget / snapshot / compression
   Instructions (AGENTS.md 层级) / Skills / Memory
   Repository Map（启动注入，默认 1500 tokens；可 /repomap 查看）
-  Code Search（按当前输入词法检索 top-K 注入，source=code_search；可 /search 查看）
+  Code Search（按当前输入检索 top-K 注入，source=code_search；backend=lexical 词法 / embedding 语义；可 /search 查看）
 
 Session 持久化、Trace JSONL、Timeline、Metrics
   · 会话自动 LLM 命名（失败回退首条用户消息截断）

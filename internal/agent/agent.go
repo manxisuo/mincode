@@ -397,12 +397,17 @@ func (a *Agent) injectCodeSearch(ctx context.Context, query string) {
 	if k <= 0 {
 		k = defaultCodeSearchTopK
 	}
+	backend := ""
+	if b, ok := a.CodeSearch.(interface{ Backend() string }); ok {
+		backend = b.Backend()
+	}
 	start := time.Now()
 	text, summary, err := a.CodeSearch.SearchContext(ctx, query, k)
 	elapsed := time.Since(start)
 	if err != nil {
 		a.emit(observability.EventCodeSearchInjected, observability.CodeSearchData{
 			Query:      query,
+			Backend:    backend,
 			TopK:       k,
 			DurationMS: elapsed.Milliseconds(),
 			Error:      err.Error(),
@@ -413,6 +418,7 @@ func (a *Agent) injectCodeSearch(ctx context.Context, query string) {
 	a.Ctx.SetCodeSearch(text)
 	a.emit(observability.EventCodeSearchInjected, observability.CodeSearchData{
 		Query:      query,
+		Backend:    backend,
 		Hits:       len(summary),
 		Top:        summary,
 		TopK:       k,

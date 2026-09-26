@@ -1,7 +1,7 @@
 # Roadmap
 
 > **状态：Phase 0–12 已全部完成**（含 Hardening 修复、MVP 验收测试、Experiment 分布统计）。
-> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection**、**Repository Map**、**Semantic Code Search（词法）** 均已落地。
+> 高级方向中 **Parallel Tool Calls**、**Web Inspector / 流式**、**Transparency Deepening（Wire View / Context Diff / Provenance / Decision Trace / Historical Replay / Tool Result / Config Resolution）**、**Plan-and-Execute**、**Web Search / Web Fetch**、**Reflection**、**Repository Map**、**Semantic Code Search（lexical + embedding）** 均已落地。
 
 ## 总体原则
 
@@ -409,7 +409,7 @@ Failures
 ```text
 Parallel Tool Calls     ✅ 已实现（Phase 13）
 Repository Map          ✅ 已实现（启动注入 + repo_map 工具）
-Semantic Code Search    ✅ 已实现（词法第一版：code_search + 每轮注入）
+Semantic Code Search    ✅ 已实现（lexical BM25 + embedding 向量后端）
 RAG
 Context Caching
 Reflection             ✅ 已实现（有界自省 + reflection.* 事件）
@@ -698,7 +698,7 @@ tree-sitter / 多语言精确符号（非 Go 仅列路径）
 
 ---
 
-## Semantic Code Search（已实现 · 词法第一版）
+## Semantic Code Search（已实现 · lexical + embedding）
 
 ### 目标
 
@@ -710,25 +710,29 @@ tree-sitter / 多语言精确符号（非 Go 仅列路径）
 
 ```text
 internal/repomap.Scan        导出：返回完整结构（不渲染/不预算），供索引构建复用解析缓存
-internal/codesearch          Index（= Searcher 实现的词法后端）
-  切块: Go 顶层符号（name/sig/kind/line）为一 chunk；非 Go 文件以路径为 chunk
-  分词: 小写 + 分隔符/驼峰切分；去停用词与 <2 字符
-  打分: BM25（k1=1.2, b=0.75），字段含 name(加权)/sig/kind/package/path
+internal/embedding           Provider 抽象（可替换）
+  FakeProvider               确定性哈希嵌入（离线、可测；同词高相似）
+  CompatibleProvider         OpenAI 兼容 /embeddings（分批、超时、错误分类）
+internal/codesearch          两个 Searcher 后端 + Retriever 接口
+  lexical  Index             BM25: name(加权)/sig/kind/package/path
+  embedding EmbeddingSearcher 余弦相似度: chunk 文本 = 结构头 + 源码摘录（含注释回看）
+                             嵌入向量按内容哈希缓存，未变更 chunk 不重复嵌入
+  切块: Go 顶层符号（name/sig/kind/line/end_line）；非 Go 文件以路径为 chunk
   渲染: 受 max_tokens 约束的紧凑块，带命中词
-  Searcher 接口: Search(ctx, query, k) ([]Hit, error)  ← 预留 embedding 后端
 Agent.CodeSearch CodeSearchProvider（结构类型，无实现依赖）
   Run 起始按 user 输入检索，成功注入 ctx（source=code_search），失败 best-effort
 code_search 工具            只读、可并行；参数 query / max_results（硬上限 15）
-/search 命令                /search <query> 打印命中与 matched 词
+/search 命令                /search <query> 打印命中与分数/matched 词
 ```
 
-- 索引复用 repomap 的增量缓存（mtime+size），每轮重建成本低（实测个位数 ms）。
+- 索引复用 repomap 的增量缓存（mtime+size），每轮重建成本低。
+- embedding 后端另按 chunk 内容哈希缓存向量；文件未变则不重复调用嵌入接口。
 - 空结果会清空 source，避免上一轮命中残留。
 
 ### 可观测
 
 ```text
-code_search.injected（query/hits/top/top_k/tokens/duration_ms/error）
+code_search.injected（query/backend/hits/top/top_k/tokens/duration_ms/error）
 Context snapshot: source=code_search（pinned）
 工具 code_search 走 tool.* 事件（meta: results/top/duration_ms）
 ```
@@ -738,18 +742,22 @@ Context snapshot: source=code_search（pinned）
 ```yaml
 codesearch:
   enabled: true
-  backend: lexical   # embedding 为预留扩展点
+  backend: lexical        # lexical | embedding
   top_k: 6
   max_tokens: 800
+
+embedding:                # backend=embedding 时必填
+  type: ""                # fake | openai-compatible
+  # base_url / api_key / model / dim / timeout_sec / batch_size
 ```
 
-### 明确不做（第一版）
+### 明确不做（本版）
 
 ```text
-embedding / 向量索引（接口已预留）
-函数体级切块与 AST 语义切分（当前以符号为单位）
-跨语言精确符号（非 Go 仅路径级检索）
-索引落盘 / 跨进程复用
+函数体级 / AST 语义切分与 rerank（当前以符号为单位 + 源码摘录）
+跨语言精确符号（非 Go 仅路径级）
+向量索引落盘 / 跨进程复用（当前为进程内内容哈希缓存）
+混合检索（lexical + embedding 融合排序）
 ```
 
 ---

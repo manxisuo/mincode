@@ -142,6 +142,7 @@ func (a *Agent) executeGroupSequential(ctx context.Context, g toolGroup, offset 
 			out = tools.Result{Content: execErr.Error(), IsError: true}
 		}
 		a.Ctx.AppendToolResult(tc.ID, out.Content)
+		a.recordToolMeta(tc, out)
 		outcomes[offset+i] = toolOutcome{call: tc, result: out}
 	}
 	return len(g.calls), nil
@@ -156,6 +157,9 @@ func (a *Agent) executeGroupParallel(ctx context.Context, g toolGroup, offset in
 		names[i] = tc.Name
 		ids[i] = tc.ID
 	}
+	// T-obs-4: record why this batch ran in parallel (all members ParallelSafe).
+	action, reason, evidence := parallelReason(len(g.calls), a.maxParallel(), true)
+	a.emitDecision("parallel", action, fmt.Sprintf("%v", names), "partition_tool_calls", reason, evidence)
 	a.emit(observability.EventToolBatchStarted, observability.ToolBatchData{
 		Size:       len(g.calls),
 		Parallel:   true,
@@ -314,6 +318,8 @@ func (a *Agent) prepareToolCall(tc llm.ToolCall, index int) (preparedCall, error
 		Summary:   p.summary,
 		Level:     level.String(),
 	})
+	a.emitDecision("permission", level.String(), tc.Name, shellPolicyName(tc.Name), decisionReason(tc.Name, level),
+		[]string{"summary=" + p.summary, "parallel=true"})
 
 	denied, perr := permission.Evaluate(a.Policy, a.Approver, req)
 	if denied {
@@ -399,4 +405,5 @@ func (a *Agent) finishToolCall(p preparedCall, result tools.Result, dur time.Dur
 	}
 	a.emit(observability.EventToolFinished, data)
 	a.Ctx.AppendToolResult(p.call.ID, result.Content)
+	a.recordToolMeta(p.call, result)
 }

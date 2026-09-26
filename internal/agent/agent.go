@@ -551,10 +551,22 @@ func (a *Agent) executeTool(ctx context.Context, tc llm.ToolCall) (tools.Result,
 	if result.IsError {
 		data.Error = result.Content
 	}
-	// T-obs-3: attach lineage meta to the tool_result entry (after Append).
-	a.Ctx.SetMeta(tc.Name, tc.Name, metaPath, "", a.Ctx.LastStep()+1)
 	a.emit(observability.EventToolFinished, data)
 	return result, nil
+}
+
+// recordToolMeta attaches T-obs-3 lineage to the tool_result entry that was
+// just appended. It must run AFTER AppendToolResult (SetMeta matches by the
+// entry's call id) and from both the serial and parallel execution paths.
+func (a *Agent) recordToolMeta(tc llm.ToolCall, result tools.Result) {
+	if a.Ctx == nil || tc.ID == "" {
+		return
+	}
+	path := ""
+	if p, ok := result.Meta["path"].(string); ok {
+		path = p
+	}
+	a.Ctx.SetMeta(tc.ID, tc.Name, path, "", a.Ctx.LastStep()+1)
 }
 
 // loadInstructionsForTool pulls in AGENTS.md for directories the tool just

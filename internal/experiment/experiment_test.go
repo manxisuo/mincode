@@ -8,6 +8,32 @@ import (
 	"time"
 )
 
+// NewStore re-joins workspace/.mincode/experiments; NewStoreAt is the root.
+func TestStoreRootKinds(t *testing.T) {
+	ws := t.TempDir()
+	fromWS, err := NewStore(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantNested := filepath.Join(ws, ".mincode", DirName)
+	if fromWS.Root() != wantNested {
+		t.Fatalf("NewStore root = %q want %q", fromWS.Root(), wantNested)
+	}
+
+	// Passing an already-resolved experiments root must not nest again.
+	resolved := filepath.Join(t.TempDir(), "projects", "demo", DirName)
+	fromRoot, err := NewStoreAt(resolved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fromRoot.Root() != resolved {
+		t.Fatalf("NewStoreAt root = %q want %q", fromRoot.Root(), resolved)
+	}
+	if strings.Contains(fromRoot.Root(), ".mincode"+string(filepath.Separator)+DirName) {
+		t.Fatalf("NewStoreAt nested unexpectedly: %q", fromRoot.Root())
+	}
+}
+
 func TestStoreSaveLoadSummarize(t *testing.T) {
 	st, err := NewStore(t.TempDir())
 	if err != nil {

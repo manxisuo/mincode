@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
 import ChatPanel from "./components/ChatPanel.vue";
 import ExperimentPanel from "./components/ExperimentPanel.vue";
 import FileChangeModal, {
@@ -58,6 +58,36 @@ const view = ref<
   | "experiments"
 >("inspector");
 
+const moreOpen = ref(false);
+const moreWrap = ref<HTMLElement | null>(null);
+
+function closeMore() {
+  moreOpen.value = false;
+}
+
+function onMoreDocClick(e: MouseEvent) {
+  if (!moreOpen.value) return;
+  const el = moreWrap.value;
+  if (el && !el.contains(e.target as Node)) closeMore();
+}
+
+watch(moreOpen, (open) => {
+  if (open) {
+    document.addEventListener("click", onMoreDocClick, true);
+  } else {
+    document.removeEventListener("click", onMoreDocClick, true);
+  }
+});
+
+function goView(v: typeof view.value) {
+  view.value = v;
+  closeMore();
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onMoreDocClick, true);
+});
+
 const stateLabel = computed(() => session.value?.state || "IDLE");
 const running = computed(() => !!session.value?.running);
 const meta = computed(() => {
@@ -65,9 +95,6 @@ const meta = computed(() => {
   if (!s) return t("app.connecting");
   return `${s.session_id} · ${s.provider}/${s.model} · ${s.workspace}`;
 });
-const themeLabel = computed(() =>
-  theme.value === "dark" ? t("app.theme.dark") : t("app.theme.light"),
-);
 const themeIcon = computed(() => (theme.value === "dark" ? "🌙" : "☀️"));
 const themeTitle = computed(() =>
   theme.value === "dark" ? t("app.theme.toLight") : t("app.theme.toDark"),
@@ -358,96 +385,75 @@ async function onSwitchSession(id: string) {
         </div>
       </div>
       <div class="top-right">
-        <nav class="view-tabs">
-          <button
-            type="button"
-            :class="{ active: view === 'inspector' }"
-            @click="view = 'inspector'"
-          >
-            {{ t("nav.inspector") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'plan' }"
-            @click="view = 'plan'"
-          >
-            {{ t("nav.plan") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'skills' }"
-            @click="view = 'skills'"
-          >
-            {{ t("nav.skills") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'instructions' }"
-            @click="view = 'instructions'"
-          >
-            {{ t("nav.instructions") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'memory' }"
-            @click="view = 'memory'"
-          >
-            {{ t("nav.memory") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'repomap' }"
-            @click="view = 'repomap'"
-          >
-            {{ t("nav.repomap") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'sessions' }"
-            @click="view = 'sessions'"
-          >
-            {{ t("nav.sessions") }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: view === 'experiments' }"
-            @click="view = 'experiments'"
-          >
-            {{ t("nav.experiments") }}
-          </button>
-        </nav>
+        <button
+          v-if="view !== 'inspector'"
+          type="button"
+          class="theme-btn"
+          @click="goView('inspector')"
+        >
+          ← {{ t("app.backInspector") }}
+        </button>
+        <span class="pill" :data-state="stateLabel">{{ stateLabel }}</span>
+        <button type="button" class="theme-btn" :title="themeTitle" @click="toggle()">
+          {{ themeIcon }}
+        </button>
         <button type="button" class="theme-btn" :title="t('app.lang')" @click="toggleLocale()">
           {{ langLabel }}
         </button>
-        <button
-          type="button"
-          class="theme-btn"
-          :title="t('cfg.title')"
-          @click="openConfig()"
-        >
-          {{ t("cfg.btn") }}
-        </button>
-        <button type="button" class="theme-btn" :title="themeTitle" @click="toggle()">
-          {{ themeIcon }} {{ themeLabel }}
-        </button>
-        <button
-          type="button"
-          class="theme-btn"
-          :title="t('app.export.title')"
-          :disabled="exportBusy"
-          @click="exportMarkdown(false)"
-        >
-          {{ t("app.export.btn") }}
-        </button>
-        <button
-          type="button"
-          class="theme-btn"
-          :title="t('app.export.mdTitle')"
-          @click="exportMarkdown(true)"
-        >
-          ↓MD
-        </button>
-        <span class="pill" :data-state="stateLabel">{{ stateLabel }}</span>
+        <div ref="moreWrap" class="more-wrap">
+          <button
+            type="button"
+            class="theme-btn"
+            :aria-expanded="moreOpen"
+            @click="moreOpen = !moreOpen"
+          >
+            {{ t("app.more") }} ▾
+          </button>
+          <div v-if="moreOpen" class="more-menu" @click.stop>
+            <button type="button" :class="{ on: view === 'inspector' }" @click="goView('inspector')">
+              {{ t("nav.inspector") }}
+            </button>
+            <button type="button" :class="{ on: view === 'plan' }" @click="goView('plan')">
+              {{ t("nav.plan") }}
+            </button>
+            <button type="button" :class="{ on: view === 'skills' }" @click="goView('skills')">
+              {{ t("nav.skills") }}
+            </button>
+            <button
+              type="button"
+              :class="{ on: view === 'instructions' }"
+              @click="goView('instructions')"
+            >
+              {{ t("nav.instructions") }}
+            </button>
+            <button type="button" :class="{ on: view === 'memory' }" @click="goView('memory')">
+              {{ t("nav.memory") }}
+            </button>
+            <button type="button" :class="{ on: view === 'repomap' }" @click="goView('repomap')">
+              {{ t("nav.repomap") }}
+            </button>
+            <button type="button" :class="{ on: view === 'sessions' }" @click="goView('sessions')">
+              {{ t("nav.sessions") }}
+            </button>
+            <button
+              type="button"
+              :class="{ on: view === 'experiments' }"
+              @click="goView('experiments')"
+            >
+              {{ t("nav.experiments") }}
+            </button>
+            <hr />
+            <button type="button" @click="closeMore(); openConfig()">
+              {{ t("cfg.btn") }}
+            </button>
+            <button type="button" :disabled="exportBusy" @click="closeMore(); exportMarkdown(false)">
+              {{ t("app.export.btn") }}
+            </button>
+            <button type="button" @click="closeMore(); exportMarkdown(true)">
+              ↓MD
+            </button>
+          </div>
+        </div>
         <button type="button" :disabled="!running" @click="cancel()">{{ t("app.cancel") }}</button>
       </div>
     </header>

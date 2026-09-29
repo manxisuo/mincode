@@ -94,11 +94,6 @@ function onTimelineClick(e: RuntimeEvent) {
   emit("deeplink", e.type, payload, displayEvents.value);
 }
 
-/** T-obs-5: pin Inspector to the historical state at this event. */
-function onReplayHere(e: RuntimeEvent) {
-  emit("replay", e, displayEvents.value);
-}
-
 type ItemRow = {
   index: number;
   source: string;
@@ -134,26 +129,14 @@ type RunRow = {
 const expanded = ref<Set<string>>(new Set());
 /** Keys of individual context items whose full preview is open. */
 const expandedItems = ref<Set<string>>(new Set());
-/** Section collapse + split height (Context vs Timeline). */
-const ctxOpen = ref(true);
-const tlOpen = ref(true);
-const ctxSplit = ref(340);
-let splitDragY = 0;
-let splitDragH = 0;
+/** Progressive disclosure: only one inspector block is visible at a time. */
+const railTab = ref<"metrics" | "context" | "timeline">("metrics");
 
-function startSplitDrag(ev: MouseEvent) {
-  splitDragY = ev.clientY;
-  splitDragH = ctxSplit.value;
-  const onMove = (e: MouseEvent) => {
-    const next = splitDragH + (e.clientY - splitDragY);
-    ctxSplit.value = Math.min(Math.max(120, next), Math.max(240, window.innerHeight - 260));
-  };
-  const onUp = () => {
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-  };
-  window.addEventListener("mousemove", onMove);
-  window.addEventListener("mouseup", onUp);
+/** T-obs-5: pin Inspector to the historical state at this event. */
+function onReplayHere(e: RuntimeEvent) {
+  // Replay result is shown in Context; switch tab so the banner is visible.
+  railTab.value = "context";
+  emit("replay", e, displayEvents.value);
 }
 
 function truncatePreview(s: string, n = 72): string {
@@ -545,31 +528,59 @@ function rawJson(e: RuntimeEvent) {
       <span class="hint">{{ events.length }} {{ t("insp.events") }}</span>
     </div>
 
-    <div class="metrics">
+    <div class="rail-tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        :class="{ active: railTab === 'metrics' }"
+        @click="railTab = 'metrics'"
+      >
+        {{ t("rail.metrics") }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :class="{ active: railTab === 'context' }"
+        @click="railTab = 'context'"
+      >
+        {{ t("rail.context") }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :class="{ active: railTab === 'timeline' }"
+        @click="railTab = 'timeline'"
+      >
+        {{ t("rail.timeline") }}
+      </button>
+    </div>
+
+    <div v-show="railTab === 'metrics'" class="metrics-compact">
       <div class="m"><span>LLM</span><b>{{ metrics.llm_calls ?? 0 }}</b></div>
       <div class="m"><span>Tokens</span><b>{{ metrics.total_tokens ?? 0 }}</b></div>
       <div class="m"><span>LLM Time</span><b>{{ metrics.llm_duration_ms ?? 0 }}ms</b></div>
       <div class="m"><span>∥ Batches</span><b>{{ metrics.parallel_batches ?? 0 }}</b></div>
-      <div class="m"><span>Errors</span><b>{{ metrics.errors ?? 0 }}</b></div>
-      <div class="m"><span>Repo Cache</span><b>{{ repoCache }}</b></div>
+    </div>
+    <div v-show="railTab === 'metrics'" class="metrics-rows">
+      <div class="row"><span>Errors</span><b>{{ metrics.errors ?? 0 }}</b></div>
+      <div class="row"><span>Repo Cache</span><b>{{ repoCache }}</b></div>
     </div>
 
-    <div class="subhead togglable" @click="ctxOpen = !ctxOpen">
+    <div v-show="railTab === 'context'" class="subhead">
       <span>
-        <span class="chev">{{ ctxOpen ? "▾" : "▸" }}</span>
         {{ t("insp.ctx") }}
-        <span v-if="ctxOpen" class="hint">{{ t("insp.ctxHint") }}</span>
+        <span class="hint">{{ t("insp.ctxHint") }}</span>
       </span>
       <button
-        v-if="ctxOpen && ctxRuns.length"
+        v-if="ctxRuns.length"
         type="button"
         class="linkish"
-        @click.stop="toggleAll()"
+        @click="toggleAll()"
       >
         {{ expanded.size > 0 ? t("insp.collapseAll") : t("insp.expandAll") }}
       </button>
     </div>
-    <div v-show="ctxOpen" class="context" :style="{ maxHeight: ctxSplit + 'px' }">
+    <div v-show="railTab === 'context'" class="context">
       <div v-if="replayStep != null" class="replay-banner">
         <span>{{ t("insp.replayAt", { n: replayStep }) }}</span>
         <button type="button" class="linkish" @click="emit('exit-replay')">
@@ -714,17 +725,10 @@ function rawJson(e: RuntimeEvent) {
       </template>
     </div>
 
-    <div
-      v-if="ctxOpen && tlOpen"
-      class="tl-split"
-      title="拖动调整 Context / Timeline 高度"
-      @mousedown.prevent="startSplitDrag"
-    ></div>
-    <div class="subhead togglable" @click="tlOpen = !tlOpen">
+    <div v-show="railTab === 'timeline'" class="subhead">
       <span>
-        <span class="chev">{{ tlOpen ? "▾" : "▸" }}</span>
         {{ t("insp.timeline") }}
-        <span v-if="tlOpen" class="hint">
+        <span class="hint">
           {{
             tlMode === "live"
               ? t("insp.liveHint")
@@ -752,7 +756,7 @@ function rawJson(e: RuntimeEvent) {
       </div>
     </div>
 
-    <div v-if="tlMode === 'history'" class="tl-history-bar">
+    <div v-if="railTab === 'timeline' && tlMode === 'history'" class="tl-history-bar">
       <select v-model="traceId" class="tl-select" @change="loadTrace()">
         <option v-for="tr in traces" :key="tr.id" :value="tr.id">
           {{ tr.id }}{{ tr.is_current ? ` (${t("common.current")})` : "" }}{{ tr.size ? ` · ${tr.size}B` : "" }}
@@ -780,16 +784,16 @@ function rawJson(e: RuntimeEvent) {
         <input v-model="showRawJson" type="checkbox" /> {{ t("insp.json") }}
       </label>
     </div>
-    <div v-if="tlMode === 'history' && (tlDirs.length || tlDir || histMeta.total)" class="tl-history-meta">
+    <div v-if="railTab === 'timeline' && tlMode === 'history' && (tlDirs.length || tlDir || histMeta.total)" class="tl-history-meta">
       {{ (tlDirs.length ? tlDirs : [tlDir]).filter(Boolean).join(" | ") }}
       · {{ traces.length }} files
       <template v-if="histMeta.total || histMeta.shown">
         · showing {{ histMeta.shown }} / {{ histMeta.total }} events
       </template>
     </div>
-    <div v-if="tlError" class="exp-error">{{ tlError }}</div>
+    <div v-if="railTab === 'timeline' && tlError" class="exp-error">{{ tlError }}</div>
 
-    <div v-show="tlOpen" class="timeline">
+    <div v-show="railTab === 'timeline'" class="timeline">
       <div v-if="!timelineRows.length" class="empty">
         {{
           tlMode === "live"

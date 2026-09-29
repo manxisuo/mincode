@@ -355,8 +355,9 @@ button.linkish:hover:not(:disabled) {
 
 .context {
   padding: 8px 14px 10px;
-  max-height: 240px;
   overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 .context .empty { color: var(--muted); font-size: 13px; }
 .ctx-row {
@@ -640,7 +641,8 @@ button.linkish:hover:not(:disabled) {
 }
 .context {
   overflow: auto;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Deep-link modals: permission history / file.changed detail */
@@ -994,6 +996,116 @@ button.linkish:hover:not(:disabled) {
 .view-tabs button.active {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.more-wrap {
+  position: relative;
+}
+.more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 40;
+}
+.more-menu button {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.more-menu button:hover {
+  border-color: transparent;
+  background: var(--panel-2);
+}
+.more-menu button.on {
+  color: var(--accent);
+}
+.more-menu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 2px;
+}
+
+/* Inspector 右栏：一页一次 */
+.rail-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.rail-tabs button {
+  padding: 7px 6px;
+  font-size: 12px;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.rail-tabs button:hover {
+  border-color: transparent;
+  background: var(--panel-2);
+  color: var(--ink);
+}
+.rail-tabs button.active {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.metrics-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px;
+}
+.metrics-compact .m {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.metrics-compact .m span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.metrics-compact .m b {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.metrics-rows {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.metrics-rows .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 4px;
+  border-bottom: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+.metrics-rows .row b {
+  font-family: var(--mono);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .layout-full {

@@ -195,7 +195,9 @@ func RunWeb(ctx context.Context, w WebOptions) error {
 		addr = "127.0.0.1:8080"
 	}
 
-	expStore, expErr := experiment.NewStore(layout.Experiments)
+	// layout.Experiments is already the experiments root; do not re-join
+	// workspace/.mincode/experiments on top of it.
+	expStore, expErr := experiment.NewStoreAt(layout.Experiments)
 	if expErr != nil {
 		fmt.Fprintf(os.Stderr, "mincode web: experiment store: %v\n", expErr)
 		expStore = nil
